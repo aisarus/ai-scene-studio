@@ -1,40 +1,439 @@
 import os
 import base64
-from typing import Optional, Literal, Any, Dict, List
+import json
+import traceback
+from typing import Optional, Literal, Dict, Any
 
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
-# Gemini (google-genai)
-try:
-    from google import genai
-except Exception:
-    genai = None
+# Optional: fallback image if no API key / provider error
+from io import BytesIO
+from PIL import Image, ImageDraw, ImageFont
 
 
-# -------------------------
+# ---------------------------
 # Config
-# -------------------------
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+# ---------------------------
+
+APP_TITLE = "AI Scene Studio API"
+
+# Provider selection:
+# - If GEMINI_API_KEY is present and google-genai is installed -> use Gemini
+# - Otherwise -> fallback images/text (so UI stays alive)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 TEXT_MODEL = os.getenv("TEXT_MODEL", "gemini-2.0-flash")
-IMAGE_MODEL = os.getenv("IMAGE_MODEL", "gemini-2.0-flash-image-generation")
-DEFAULT_KEY_COLOR = os.getenv("DEFAULT_KEY_COLOR", "#00FF00")
+IMAGE_MODEL = os.getenv("IMAGE_MODEL", "gemini-2.0-flash-image-generation")  # override in Render env if needed
 
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
-INDEX_PATH = os.path.join(STATIC_DIR, "index.html")
+# Chroma key default (green)
+DEFAULT_KEY_COLOR = os.getenv("KEY_COLOR", "#00FF00")
+
+STATIC_DIR = os.getenv("STATIC_DIR", "static")
+INDEX_FILE = os.path.join(STATIC_DIR, "index.html")
 
 
-# -------------------------
+# ---------------------------
+# Gemini client (lazy)
+# ---------------------------
+
+_gemini_client = None
+_gemini_import_error = None
+
+
+def get_gemini_client():
+    global _gemini_client, _gemini_import_error
+    if _gemini_client is not None:
+        return _gemini_client
+
+    if not GEMINI_API_KEY:
+        _gemini_import_error = "GEMINI_API_KEY / GOOGLE_API_KEY is not set"
+        return None
+
+    try:
+        # New SDK: google-genai
+        # pip: google-genai
+        from google import genai  # type: ignore
+        _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+        return _gemini_client
+    except Exception as e:
+        _gemini_import_error = f"Failed to import/init google-genai: {type(e).__name__}: {e}"
+        return None
+
+
+# ---------------------------
+# Models
+# ---------------------------
+
+class PingResponse(BaseModel):
+    ok: bool
+    provider: str
+    text_model: str
+    image_model: str
+    static_dir: str
+
+
+class ImprovePromptRequest(BaseModel):
+    prompt: str = Field(..., min_length=1)
+    kind: Literal["scene", "background", "subject"] = "scene"
+
+
+class ImprovePromptResponse(BaseModel):
+    improved: str
+    notes: str
+    used_provider: str
+
+
+class GenerateTextRequest(BaseModel):
+    prompt: str = Field(..., min_length=1)
+
+
+class GenerateTextResponse(BaseModel):
+    text: str
+    used_provider: str
+
+
+class GenerateLayerRequest(BaseModel):
+    layer_kind: Literal["background", "subject"] = "background"
+    prompt: str = Field(..., min_length=1)
+    key_color: Optional[str] = None  # e.g. "#00FF00"
+    # optional controls passed by UI; server doesn't need them but keeps for future
+    style: Optional[str] = None
+    aspect: Optional[str] = None  # "1:1", "16:9", etc.
+
+
+class GenerateLayerResponse(BaseModel):
+    image_base64: str
+    mime_type: str = "image/png"
+    layer_kind: str
+    key_color: str
+    final_prompt: str
+    used_provider: str
+    used_fallback: bool
+    debug: Optional[Dict[str, Any]] = None
+
+
+# ---------------------------
+# Helpers
+# ---------------------------
+
+def _safe_json_error(message: str, status: int = 400, debug: Optional[dict] = None):
+    payload = {"error": message}
+    if debug:
+        payload["debug"] = debug
+    return JSONResponse(payload, status_code=status)
+
+
+def _make_fallback_png(text: str) -> str:
+    """
+    Generates a simple PNG with text and returns base64 (no external assets).
+    """
+    W, H = 1024, 640
+    img = Image.new("RGB", (W, H), (18, 22, 28))
+    d = ImageDraw.Draw(img)
+
+    # Try to use a default font; if not available, pillow will use its own
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+
+    pad = 28
+    lines = []
+    s = text.strip()
+    if not s:
+        s = "No text"
+    # naive wrap
+    max_chars = 70
+    while len(s) > max_chars:
+        lines.append(s[:max_chars])
+        s = s[max_chars:]
+    lines.append(s)
+
+    y = pad
+    d.text((pad, y), "Fallback image (no provider / error)", fill=(180, 200, 220), font=font)
+    y += 28
+
+    for line in lines[:18]:
+        d.text((pad, y), line, fill=(235, 235, 235), font=font)
+        y += 24
+
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("utf-8")
+
+
+def improve_prompt_local(prompt: str, kind: str) -> ImprovePromptResponse:
+    """
+    Honest local "improver": not magic, just adds structure and constraints.
+    """
+    p = prompt.strip()
+
+    if kind == "background":
+        improved = (
+            f"{p}\n\n"
+            "Constraints:\n"
+            "- Background only: NO characters, NO objects in foreground.\n"
+            "- High quality, coherent lighting.\n"
+            "- No text, no watermark, no logos.\n"
+        )
+        notes = "Local rules: background-only constraints + quality/no-text."
+    elif kind == "subject":
+        improved = (
+            f"{p}\n\n"
+            "Constraints:\n"
+            "- Single subject only, centered, fully visible (not cropped).\n"
+            f"- Solid flat chroma background color ONLY ({DEFAULT_KEY_COLOR}), no gradient, no shadows.\n"
+            "- No extra objects, no scenery, no text, no watermark.\n"
+            "- Clean edges.\n"
+        )
+        notes = "Local rules: single-subject constraints + chroma background + no extras."
+    else:
+        improved = (
+            f"{p}\n\n"
+            "Output requirements:\n"
+            "- One clear scene.\n"
+            "- Specify style, lighting, camera angle.\n"
+            "- No text, no watermark.\n"
+        )
+        notes = "Local rules: structured prompt (style/lighting/camera) + no-text."
+    return ImprovePromptResponse(improved=improved, notes=notes, used_provider="local")
+
+
+def build_layer_prompt(req: GenerateLayerRequest) -> str:
+    base = req.prompt.strip()
+    key_color = (req.key_color or DEFAULT_KEY_COLOR).upper()
+
+    if req.layer_kind == "background":
+        return (
+            f"{base}\n\n"
+            "Rules:\n"
+            "- Background plate only.\n"
+            "- No characters, no main subject in foreground.\n"
+            "- No text, no watermark.\n"
+            "- Photorealistic or coherent illustration (follow user's style), consistent lighting.\n"
+        )
+
+    # subject layer
+    return (
+        f"{base}\n\n"
+        "STRICT RULES:\n"
+        "- ONE main subject only.\n"
+        "- Centered, fully visible (not cropped).\n"
+        f"- Background must be a perfectly solid flat color: {key_color} (no gradient, no shadow, no texture).\n"
+        "- No additional objects, no scenery.\n"
+        "- No text, no watermark.\n"
+        "- Clean edges.\n"
+    )
+
+
+def gemini_generate_text(prompt: str) -> str:
+    client = get_gemini_client()
+    if client is None:
+        raise RuntimeError(_gemini_import_error or "Gemini client not available")
+
+    # google-genai API style (new)
+    resp = client.models.generate_content(
+        model=TEXT_MODEL,
+        contents=[prompt],
+    )
+
+    # Try common fields
+    txt = getattr(resp, "text", None)
+    if txt:
+        return txt
+
+    # fallback: parse candidates
+    cands = getattr(resp, "candidates", None) or []
+    parts_out = []
+    for c in cands:
+        content = getattr(c, "content", None)
+        parts = getattr(content, "parts", None) or []
+        for p in parts:
+            t = getattr(p, "text", None)
+            if t:
+                parts_out.append(t)
+    return "\n".join(parts_out).strip()
+
+
+def gemini_generate_image_base64(prompt: str) -> Dict[str, str]:
+    """
+    Returns dict with keys: image_base64, mime_type.
+    Works only if provider returns inline_data.
+    """
+    client = get_gemini_client()
+    if client is None:
+        raise RuntimeError(_gemini_import_error or "Gemini client not available")
+
+    resp = client.models.generate_content(
+        model=IMAGE_MODEL,
+        contents=[prompt],
+    )
+
+    # Search inline_data in response candidates/parts
+    cands = getattr(resp, "candidates", None) or []
+    for c in cands:
+        content = getattr(c, "content", None)
+        parts = getattr(content, "parts", None) or []
+        for part in parts:
+            inline = getattr(part, "inline_data", None)
+            if inline and getattr(inline, "data", None):
+                data = inline.data
+                if isinstance(data, (bytes, bytearray)):
+                    data = base64.b64encode(data).decode("utf-8")
+                mime = getattr(inline, "mime_type", "image/png")
+                return {"image_base64": data, "mime_type": mime}
+
+    # Some SDK versions expose parts directly
+    parts = getattr(resp, "parts", None) or []
+    for part in parts:
+        inline = getattr(part, "inline_data", None)
+        if inline and getattr(inline, "data", None):
+            data = inline.data
+            if isinstance(data, (bytes, bytearray)):
+                data = base64.b64encode(data).decode("utf-8")
+            mime = getattr(inline, "mime_type", "image/png")
+            return {"image_base64": data, "mime_type": mime}
+
+    raise RuntimeError("Image not generated (no inline_data in response).")
+
+
+# ---------------------------
 # App
-# -------------------------
-app = FastAPI()
+# ---------------------------
+
+app = FastAPI(title=APP_TITLE)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # demo mode
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/api/ping", response_model=PingResponse)
+def ping():
+    provider = "gemini" if (get_gemini_client() is not None) else "local"
+    return PingResponse(
+        ok=True,
+        provider=provider,
+        text_model=TEXT_MODEL,
+        image_model=IMAGE_MODEL,
+        static_dir=STATIC_DIR,
+    )
+
+
+@app.post("/api/improve_prompt", response_model=ImprovePromptResponse)
+def improve_prompt(req: ImprovePromptRequest):
+    # Try provider first, fallback to local rules
+    client = get_gemini_client()
+    if client is None:
+        return improve_prompt_local(req.prompt, req.kind)
+
+    # Provider-based improver: still "честно", просто просим модель переформулировать
+    # и добавляем ограничения по виду слоя.
+    local = improve_prompt_local(req.prompt, req.kind)
+    meta = (
+        "You are a prompt improver. Keep the user's meaning. "
+        "Make it more specific and production-ready. "
+        "Return ONLY the improved prompt, no commentary."
+    )
+    prompt = f"{meta}\n\nUSER PROMPT:\n{req.prompt}\n\nHARD CONSTRAINTS TO INCLUDE:\n{local.improved.split('Constraints:',1)[-1] if 'Constraints:' in local.improved else ''}"
+    try:
+        improved = gemini_generate_text(prompt).strip()
+        if not improved:
+            return local
+        return ImprovePromptResponse(improved=improved, notes="Gemini rewrite + constraints.", used_provider="gemini")
+    except Exception:
+        return local
+
+
+@app.post("/api/generate_text", response_model=GenerateTextResponse)
+def generate_text(req: GenerateTextRequest):
+    client = get_gemini_client()
+    if client is None:
+        # Local fallback: just echo (so UI doesn't die)
+        return GenerateTextResponse(text=req.prompt.strip(), used_provider="local")
+
+    try:
+        text = gemini_generate_text(req.prompt).strip()
+        return GenerateTextResponse(text=text or "", used_provider="gemini")
+    except Exception as e:
+        return GenerateTextResponse(text=f"[error] {type(e).__name__}: {e}", used_provider="gemini")
+
+
+@app.post("/api/generate_layer", response_model=GenerateLayerResponse)
+def generate_layer(req: GenerateLayerRequest):
+    final_prompt = build_layer_prompt(req)
+    key_color = (req.key_color or DEFAULT_KEY_COLOR).upper()
+
+    # Try Gemini image generation, fallback to generated PNG
+    client = get_gemini_client()
+    if client is None:
+        img_b64 = _make_fallback_png(f"{req.layer_kind.upper()} layer\n\n{final_prompt}")
+        return GenerateLayerResponse(
+            image_base64=img_b64,
+            mime_type="image/png",
+            layer_kind=req.layer_kind,
+            key_color=key_color,
+            final_prompt=final_prompt,
+            used_provider="local",
+            used_fallback=True,
+            debug={"reason": _gemini_import_error},
+        )
+
+    try:
+        out = gemini_generate_image_base64(final_prompt)
+        return GenerateLayerResponse(
+            image_base64=out["image_base64"],
+            mime_type=out.get("mime_type", "image/png"),
+            layer_kind=req.layer_kind,
+            key_color=key_color,
+            final_prompt=final_prompt,
+            used_provider="gemini",
+            used_fallback=False,
+            debug={"model": IMAGE_MODEL},
+        )
+    except Exception as e:
+        # Fallback image so UI keeps working
+        img_b64 = _make_fallback_png(f"ERROR -> fallback\n{type(e).__name__}: {e}\n\n{final_prompt}")
+        return GenerateLayerResponse(
+            image_base64=img_b64,
+            mime_type="image/png",
+            layer_kind=req.layer_kind,
+            key_color=key_color,
+            final_prompt=final_prompt,
+            used_provider="gemini",
+            used_fallback=True,
+            debug={
+                "error": f"{type(e).__name__}: {e}",
+                "trace": traceback.format_exc(limit=2),
+                "model": IMAGE_MODEL,
+            },
+        )
+
+
+# ---------------------------
+# Static + index
+# ---------------------------
+
+@app.get("/", response_class=HTMLResponse)
+def root():
+    # Serve index.html explicitly (more reliable than relying on html=True mount alone)
+    if os.path.exists(INDEX_FILE):
+        with open(INDEX_FILE, "r", encoding="utf-8") as f:
+            return HTMLResponse(f.read())
+    return HTMLResponse("<h1>Missing static/index.html</h1>", status_code=500)
+
+
+# Mount static directory at /static
+# (This avoids the classic 'app.mount(...)def ...' paste disaster and keeps routes clean.)
+if os.path.isdir(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
