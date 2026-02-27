@@ -3,14 +3,12 @@ services:
     name: ai-scene-studio
     env: python
     plan: free
-
-    buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
-
-    startCommand: |
-      uvicorn server:app --host 0.0.0.0 --port $PORT
-
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      # добавь свой ключ в Render -> Environment
+      # - key: GEMINI_API_KEY
+      #   sync: false
