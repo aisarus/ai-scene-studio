@@ -1,40 +1,175 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AI Scene Studio</title>
-<style>
-  :root{
-    --bg:#0b0f17;
-    --panel:#121a27;
-    --panel2:#0f1622;
-    --text:#e8eefc;
-    --muted:#9bb0d6;
-    --line:#213049;
-    --accent:#4c8dff;
-    --danger:#ff4c6a;
-    --shadow: 0 12px 30px rgba(0,0,0,.35);
-    --r:16px;
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>AI Scene Studio</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#0b0f17;color:#e9eefc}
+    .wrap{max-width:980px;margin:0 auto;padding:20px}
+    .card{background:#121a2a;border:1px solid #22304f;border-radius:14px;padding:16px;margin:12px 0;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+    h1{font-size:20px;margin:0 0 6px}
+    .muted{opacity:.7;font-size:13px}
+    textarea,input,select,button{width:100%;box-sizing:border-box;border-radius:12px;border:1px solid #2a3b63;background:#0e1524;color:#e9eefc;padding:10px;font-size:14px}
+    textarea{min-height:110px;resize:vertical}
+    button{cursor:pointer;background:#2b63ff;border-color:#2b63ff;font-weight:600}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+    .out{white-space:pre-wrap;background:#0c1220;border:1px solid #22304f;border-radius:12px;padding:12px;min-height:60px}
+    img{max-width:100%;border-radius:12px;border:1px solid #22304f}
+    .pill{display:inline-block;padding:4px 10px;border:1px solid #22304f;border-radius:999px;font-size:12px;opacity:.8;margin-left:8px}
+    .err{color:#ff6b6b}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>AI Scene Studio <span class="pill">FastAPI + Render + Gemini</span></h1>
+      <div class="muted">Если снова упадёт, значит это не пробелы. Уже прогресс.</div>
+      <div class="muted">Health: <span id="health">…</span></div>
+    </div>
+
+    <div class="card">
+      <h1>Generate Text</h1>
+      <textarea id="textPrompt" placeholder="Напиши сцену про…"></textarea>
+      <div style="height:10px"></div>
+      <button id="btnText">Сгенерировать текст</button>
+      <div style="height:12px"></div>
+      <div id="textOut" class="out"></div>
+    </div>
+
+    <div class="card">
+      <h1>Generate Image</h1>
+      <textarea id="imgPrompt" placeholder="A cinematic photo of…"></textarea>
+      <div style="height:10px"></div>
+      <button id="btnImg">Сгенерировать картинку</button>
+      <div style="height:12px"></div>
+      <div id="imgMeta" class="muted"></div>
+      <div style="height:10px"></div>
+      <img id="imgOut" alt="" style="display:none"/>
+    </div>
+
+    <div class="card">
+      <h1>Generate Layer (background / object)</h1>
+      <div class="row3">
+        <select id="layerKind">
+          <option value="background">background</option>
+          <option value="object">object (chroma key)</option>
+        </select>
+        <input id="keyColor" placeholder="#00FF00 (для object)" value="#00FF00"/>
+        <input id="layerName" placeholder="layer name (optional)"/>
+      </div>
+      <div style="height:10px"></div>
+      <textarea id="layerPrompt" placeholder="Prompt для слоя…"></textarea>
+      <div style="height:10px"></div>
+      <button id="btnLayer">Сгенерировать слой</button>
+      <div style="height:12px"></div>
+      <div id="layerMeta" class="muted"></div>
+      <div style="height:10px"></div>
+      <img id="layerOut" alt="" style="display:none"/>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function setBusy(btn, busy) {
+    btn.disabled = !!busy;
+    btn.textContent = busy ? "Работаю…" : btn.dataset.label;
   }
-  *{box-sizing:border-box}
-  body{
-    margin:0;
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
-    background: radial-gradient(1200px 800px at 30% 10%, #13213b 0%, var(--bg) 55%) fixed;
-    color: var(--text);
+
+  async function api(path, payload) {
+    const r = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || data.error) {
+      const msg = data.error || ("HTTP " + r.status);
+      throw new Error(msg);
+    }
+    return data;
   }
-  header{
-    position: sticky; top:0; z-index:10;
-    backdrop-filter: blur(10px);
-    background: rgba(11,15,23,.65);
-    border-bottom: 1px solid rgba(33,48,73,.6);
+
+  async function checkHealth() {
+    try {
+      const r = await fetch("/health");
+      const j = await r.json();
+      $("health").textContent = j.ok ? "OK" : ("NO: " + (j.reason || "unknown"));
+    } catch(e) {
+      $("health").innerHTML = '<span class="err">DOWN</span>';
+    }
   }
-  .wrap{max-width: 1200px; margin:0 auto; padding: 14px 16px;}
-  .brand{display:flex; align-items:center; gap:10px; font-weight:900;}
-  .dot{width:10px;height:10px;border-radius:999px;background:var(--accent); box-shadow: 0 0 20px rgba(76,141,255,.8);}
-  .sub{color:var(--muted); font-weight:600; font-size:12px; margin-top:2px}
-  .grid{
+
+  function showImage(imgEl, metaEl, base64, mime, extra) {
+    imgEl.src = `data:${mime};base64,${base64}`;
+    imgEl.style.display = "block";
+    metaEl.textContent = (extra ? (extra + " | ") : "") + (mime || "image/png") + " | base64 length=" + base64.length;
+  }
+
+  window.addEventListener("load", () => {
+    checkHealth();
+
+    const btnText = $("btnText");
+    btnText.dataset.label = btnText.textContent;
+    btnText.addEventListener("click", async () => {
+      setBusy(btnText, true);
+      $("textOut").textContent = "";
+      try {
+        const prompt = $("textPrompt").value;
+        const out = await api("/api/generate_text", { prompt });
+        $("textOut").textContent = out.text || "(empty)";
+      } catch(e) {
+        $("textOut").innerHTML = '<span class="err">' + e.message + '</span>';
+      } finally {
+        setBusy(btnText, false);
+      }
+    });
+
+    const btnImg = $("btnImg");
+    btnImg.dataset.label = btnImg.textContent;
+    btnImg.addEventListener("click", async () => {
+      setBusy(btnImg, true);
+      $("imgOut").style.display = "none";
+      $("imgMeta").textContent = "";
+      try {
+        const prompt = $("imgPrompt").value;
+        const out = await api("/api/generate_image", { prompt });
+        showImage($("imgOut"), $("imgMeta"), out.image_base64, out.mime_type, "");
+      } catch(e) {
+        $("imgMeta").innerHTML = '<span class="err">' + e.message + '</span>';
+      } finally {
+        setBusy(btnImg, false);
+      }
+    });
+
+    const btnLayer = $("btnLayer");
+    btnLayer.dataset.label = btnLayer.textContent;
+    btnLayer.addEventListener("click", async () => {
+      setBusy(btnLayer, true);
+      $("layerOut").style.display = "none";
+      $("layerMeta").textContent = "";
+      try {
+        const payload = {
+          prompt: $("layerPrompt").value,
+          layer_kind: $("layerKind").value,
+          key_color: $("keyColor").value,
+          layer_name: $("layerName").value
+        };
+        const out = await api("/api/generate_layer", payload);
+        const extra = `${out.layer_kind}` + (out.layer_name ? (" | " + out.layer_name) : "") + (out.key_color ? (" | key=" + out.key_color) : "");
+        showImage($("layerOut"), $("layerMeta"), out.image_base64, out.mime_type, extra);
+      } catch(e) {
+        $("layerMeta").innerHTML = '<span class="err">' + e.message + '</span>';
+      } finally {
+        setBusy(btnLayer, false);
+      }
+    });
+  });
+</script>
+</body>
+</html>  .grid{
     max-width: 1200px; margin: 16px auto; padding: 0 16px 22px;
     display:grid; grid-template-columns: 380px 1fr; gap: 14px;
   }
