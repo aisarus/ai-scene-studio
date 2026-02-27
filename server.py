@@ -1,40 +1,108 @@
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
 import os
 import base64
+from typing import Optional
 
-# Official Google Gen AI SDK (Gemini API)
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from google import genai
+from google.genai import types
+
+# =========================
+# INIT
+# =========================
 
 app = FastAPI()
 
-API_KEY = os.environ.get("GEMINI_API_KEY")
-client = genai.Client(api_key=API_KEY) if API_KEY else None
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-TEXT_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
-IMAGE_MODEL = os.environ.get("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-KEY_COLOR = "#00FF00"  # chroma key for pseudo-layers
+if not GEMINI_API_KEY:
+    raise RuntimeError("GEMINI_API_KEY not set")
+
+client = genai.Client(api_key=GEMINI_API_KEY)
+
+# =========================
+# MODELS
+# =========================
 
 class TextRequest(BaseModel):
     prompt: str
 
+
 class ImageRequest(BaseModel):
     prompt: str
 
-class LayerRequest(BaseModel):
-    prompt: str
-    layer_name: str
-    layer_kind: str  # "background" | "object"
-    key_color: str | None = None  # optional override
+
+# =========================
+# TEXT GENERATION
+# =========================
+
+@app.post("/api/generate-text")
+def generate_text(req: TextRequest):
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=req.prompt,
+        )
+
+        text = response.text if hasattr(response, "text") else None
+
+        if not text:
+            return {"error": "No text generated"}
+
+        return {"text": text}
+
+    except Exception as e:
+        return {"error": f"Text generation failed: {type(e).__name__}: {e}"}
 
 
-@app.get("/")
-def root():
-    return FileResponse("static/index.html")
+# =========================
+# IMAGE GENERATION
+# =========================
 
+@app.post("/api/generate-image")
+def generate_image(req: ImageRequest):
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-preview-image-generation",
+            contents=req.prompt,
+            config=types.GenerateContentConfig(
+                response_modalities=["TEXT", "IMAGE"]
+            ),
+        )
+
+        for part in response.candidates[0].content.parts:
+            if part.inline_data:
+                data = part.inline_data.data
+
+                if isinstance(data, (bytes, bytearray)):
+                    data = base64.b64encode(data).decode("utf-8")
+
+                return {
+                    "image_base64": data,
+                    "mime_type": part.inline_data.mime_type or "image/png",
+                }
+
+        return {"error": "Image not generated (no inline_data found)"}
+
+    except Exception as e:
+        return {"error": f"Image generation failed: {type(e).__name__}: {e}"}
+
+
+# =========================
+# STATIC FRONTEND
+# =========================
+
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 @app.get("/health")
 def health():
