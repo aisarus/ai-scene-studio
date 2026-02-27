@@ -5,36 +5,550 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>AI Scene Studio</title>
 <style>
-:root{--bg:#0b0f17;--panel:#121a27;--panel2:#0f1622;--text:#e8eefc;--muted:#9bb0d6;--line:#213049;--accent:#4c8dff;--accent2:#2f6ae6;--danger:#ff4c6a;--shadow:0 12px 30px rgba(0,0,0,.35);--r:16px}
-*{box-sizing:border-box}
-body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:radial-gradient(1200px 800px at 30% 10%,#13213b 0%,var(--bg) 55%) fixed;color:var(--text)}
-header{position:sticky;top:0;z-index:10;backdrop-filter:blur(10px);background:rgba(11,15,23,.65);border-bottom:1px solid rgba(33,48,73,.6)}
-.wrap{max-width:1200px;margin:0 auto;padding:14px 16px}
-.brand{display:flex;align-items:center;gap:10px;font-weight:800}
-.dot{width:10px;height:10px;border-radius:999px;background:var(--accent);box-shadow:0 0 20px rgba(76,141,255,.8)}
-.sub{color:var(--muted);font-weight:600;font-size:12px;margin-top:2px}
-.grid{max-width:1200px;margin:16px auto;padding:0 16px 22px;display:grid;grid-template-columns:360px 1fr;gap:14px}
-.card{background:linear-gradient(180deg,rgba(18,26,39,.95),rgba(15,22,34,.95));border:1px solid rgba(33,48,73,.9);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
-.card h2{margin:0;padding:14px 14px 10px;font-size:14px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);border-bottom:1px solid rgba(33,48,73,.8);background:rgba(15,22,34,.55)}
-.pad{padding:14px}
-textarea{width:100%;min-height:120px;resize:vertical;padding:12px;border-radius:12px;border:1px solid rgba(33,48,73,.9);outline:none;background:rgba(7,10,16,.65);color:var(--text);line-height:1.35}
-textarea:focus{border-color:rgba(76,141,255,.9);box-shadow:0 0 0 3px rgba(76,141,255,.15)}
-.row{display:flex;gap:10px;flex-wrap:wrap}
-button{appearance:none;border:1px solid rgba(76,141,255,.55);background:linear-gradient(180deg,rgba(76,141,255,1),rgba(47,106,230,1));color:white;padding:10px 12px;border-radius:12px;font-weight:800;cursor:pointer;box-shadow:0 10px 24px rgba(76,141,255,.18)}
-button.secondary{background:rgba(7,10,16,.55);border-color:rgba(33,48,73,.9);box-shadow:none;color:var(--text)}
-button.danger{background:rgba(255,76,106,.12);border-color:rgba(255,76,106,.45);color:#ffd2da;box-shadow:none}
-button:disabled{opacity:.55;cursor:not-allowed;filter:grayscale(.2)}
-.hint{color:var(--muted);font-size:12px;margin-top:8px;line-height:1.35}
-.kpi{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
-.pill{font-size:12px;color:var(--muted);border:1px solid rgba(33,48,73,.9);background:rgba(7,10,16,.55);padding:8px 10px;border-radius:999px}
-.layers{display:flex;flex-direction:column;gap:10px}
-.layer{border:1px solid rgba(33,48,73,.9);background:rgba(7,10,16,.55);border-radius:14px;padding:10px}
-.layerTop{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.layerName{font-weight:900;font-size:13px}
-.layer small{color:var(--muted);display:block;margin-top:4px}
-.layer textarea{min-height:80px;margin-top:10px}
-.split{display:grid;grid-template-columns:1fr 340px;gap:14px}
-.preview{padding:14px}
+  :root{
+    --bg:#0b0f17;
+    --panel:#121a27;
+    --panel2:#0f1622;
+    --text:#e8eefc;
+    --muted:#9bb0d6;
+    --line:#213049;
+    --accent:#4c8dff;
+    --danger:#ff4c6a;
+    --shadow: 0 12px 30px rgba(0,0,0,.35);
+    --r:16px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    background: radial-gradient(1200px 800px at 30% 10%, #13213b 0%, var(--bg) 55%) fixed;
+    color: var(--text);
+  }
+  header{
+    position: sticky; top:0; z-index:10;
+    backdrop-filter: blur(10px);
+    background: rgba(11,15,23,.65);
+    border-bottom: 1px solid rgba(33,48,73,.6);
+  }
+  .wrap{max-width: 1200px; margin:0 auto; padding: 14px 16px;}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:900;}
+  .dot{width:10px;height:10px;border-radius:999px;background:var(--accent); box-shadow: 0 0 20px rgba(76,141,255,.8);}
+  .sub{color:var(--muted); font-weight:600; font-size:12px; margin-top:2px}
+  .grid{
+    max-width: 1200px; margin: 16px auto; padding: 0 16px 22px;
+    display:grid; grid-template-columns: 380px 1fr; gap: 14px;
+  }
+  .card{
+    background: linear-gradient(180deg, rgba(18,26,39,.95), rgba(15,22,34,.95));
+    border: 1px solid rgba(33,48,73,.9);
+    border-radius: var(--r);
+    box-shadow: var(--shadow);
+    overflow:hidden;
+  }
+  .card h2{
+    margin:0; padding: 14px 14px 10px;
+    font-size: 14px; text-transform: uppercase; letter-spacing: .12em;
+    color: var(--muted);
+    border-bottom: 1px solid rgba(33,48,73,.8);
+    background: rgba(15,22,34,.55);
+  }
+  .pad{padding: 14px;}
+  textarea{
+    width:100%;
+    min-height: 120px;
+    resize: vertical;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(33,48,73,.9);
+    outline: none;
+    background: rgba(7,10,16,.65);
+    color: var(--text);
+    line-height: 1.35;
+  }
+  textarea:focus{ border-color: rgba(76,141,255,.9); box-shadow: 0 0 0 3px rgba(76,141,255,.15); }
+  .row{display:flex; gap:10px; flex-wrap: wrap;}
+  button{
+    appearance: none;
+    border: 1px solid rgba(76,141,255,.55);
+    background: linear-gradient(180deg, rgba(76,141,255,1), rgba(47,106,230,1));
+    color: white;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(76,141,255,.18);
+  }
+  button.secondary{
+    background: rgba(7,10,16,.55);
+    border-color: rgba(33,48,73,.9);
+    box-shadow: none;
+    color: var(--text);
+  }
+  button.danger{
+    background: rgba(255,76,106,.12);
+    border-color: rgba(255,76,106,.45);
+    color: #ffd2da;
+    box-shadow:none;
+  }
+  button:disabled{opacity:.55; cursor:not-allowed;}
+  .hint{color: var(--muted); font-size: 12px; margin-top:8px; line-height:1.35;}
+  .pill{
+    font-size: 12px;
+    color: var(--muted);
+    border: 1px solid rgba(33,48,73,.9);
+    background: rgba(7,10,16,.55);
+    padding: 8px 10px;
+    border-radius: 999px;
+  }
+  .kpi{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;}
+  .error{
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,76,106,.45);
+    background: rgba(255,76,106,.10);
+    color: #ffd2da;
+    display:none;
+    white-space: pre-wrap;
+  }
+  .error.show{display:block;}
+  .layers{display:flex; flex-direction:column; gap:10px; margin-top:12px;}
+  .layer{
+    border: 1px solid rgba(33,48,73,.9);
+    background: rgba(7,10,16,.55);
+    border-radius: 14px;
+    padding: 10px;
+  }
+  .layerTop{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .layerName{font-weight: 950; font-size: 13px;}
+  .layer small{color:var(--muted); display:block; margin-top:3px;}
+  .layer textarea{min-height: 80px; margin-top:10px;}
+  .sliders{display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;}
+  .sliderBox{border:1px solid rgba(33,48,73,.7); border-radius:12px; padding:10px; background: rgba(0,0,0,.12);}
+  .sliderBox label{display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:6px;}
+  input[type="range"]{width:100%;}
+  .split{display:grid; grid-template-columns: 1fr 340px; gap: 14px;}
+  .imgBox{
+    width:100%;
+    aspect-ratio: 4/3;
+    border-radius: 14px;
+    border: 1px dashed rgba(33,48,73,.9);
+    background: rgba(7,10,16,.35);
+    overflow:hidden;
+    position: relative;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  canvas{width:100%; height:100%; display:block;}
+  .overlay{
+    position:absolute; inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    gap:10px;
+    background: rgba(0,0,0,.35);
+    font-weight: 900;
+  }
+  .overlay.show{display:flex;}
+  .spinner{
+    width:26px; height:26px;
+    border-radius: 999px;
+    border: 3px solid rgba(155,176,214,.35);
+    border-top-color: rgba(232,238,252,.95);
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .history{display:flex; flex-direction:column; gap:8px; margin-top: 12px;}
+  .histItem{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    border: 1px solid rgba(33,48,73,.9);
+    background: rgba(7,10,16,.55);
+    border-radius: 12px;
+    padding: 10px;
+  }
+  .histItem a{color:var(--text); font-weight: 950; text-decoration:none;}
+  .histItem span{color:var(--muted); font-size:12px;}
+  @media (max-width: 980px){
+    .grid{grid-template-columns: 1fr;}
+    .split{grid-template-columns: 1fr;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div>AI Scene Studio</div>
+        <div class="sub">Псевдо-слои: фон отдельно, объекты отдельно (хромакей) → сборка на canvas</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="grid">
+  <section class="card">
+    <h2>Слои</h2>
+    <div class="pad">
+      <div class="row">
+        <button id="btnDecompose" onclick="decompose()">Разбить сцену</button>
+        <button class="secondary" onclick="resetAll()">Сбросить</button>
+      </div>
+
+      <div class="kpi">
+        <div class="pill" id="pillKey">🔑 ключ: ?</div>
+        <div class="pill" id="pillModels">🤖 модели: ?</div>
+        <div class="pill" id="pillKeyColor">🟩 key: ?</div>
+      </div>
+
+      <div class="hint">
+        Схема: генеришь фон отдельно, потом каждый слой-объект отдельно на зелёном (#00FF00), UI вырезает зелёный и накладывает.
+        Меняешь промпт слоя → регенеришь только этот слой.
+      </div>
+
+      <div class="error" id="errBox"></div>
+      <div class="layers" id="layers"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Мастерская</h2>
+    <div class="pad split">
+      <div>
+        <textarea id="sceneInput" placeholder="Опиши сцену. Потом нажми «Разбить сцену». Пример: Девушка в красном плаще стоит на улице Токио ночью, неон, дождь, cinematic, 35mm."></textarea>
+
+        <div class="row" style="margin-top:10px">
+          <button id="btnGenAll" onclick="generateAll()">Сгенерировать всё</button>
+          <button class="secondary" onclick="improveWholePrompt()">Улучшить текст сцены</button>
+        </div>
+
+        <div class="hint" id="promptUsed"></div>
+
+        <div class="history" id="history"></div>
+      </div>
+
+      <div>
+        <div class="imgBox">
+          <canvas id="canvas"></canvas>
+          <div class="overlay" id="overlay">
+            <div class="spinner"></div>
+            <div>Генерирую…</div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="secondary" onclick="downloadComposite()">Скачать PNG</button>
+          <button class="secondary" onclick="exportSceneJSON()">Экспорт JSON</button>
+        </div>
+        <div class="hint">Сборка делается в браузере. Это “дешёвый трюк”, но для MVP он работает чересчур хорошо.</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+let layers = []; // {name, role, prompt, kind, imageDataUrl, keyColor, x, y, scale, opacity, chromaThreshold}
+let historyItems = [];
+let busy = false;
+let KEY_COLOR = "#00FF00";
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function setError(msg){
+  const box = document.getElementById("errBox");
+  if(!msg){ box.classList.remove("show"); box.textContent=""; return; }
+  box.textContent = msg;
+  box.classList.add("show");
+}
+
+function setBusy(isBusy){
+  busy = isBusy;
+  document.getElementById("btnDecompose").disabled = isBusy;
+  document.getElementById("btnGenAll").disabled = isBusy;
+  document.getElementById("overlay").classList.toggle("show", isBusy);
+}
+
+async function apiPost(url, body){
+  const res = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+  return await res.json();
+}
+
+async function boot(){
+  try{
+    const res = await fetch("/health");
+    const data = await res.json();
+    document.getElementById("pillKey").textContent = data.has_key ? "🔑 ключ: ок" : "🔑 ключ: нет";
+    document.getElementById("pillModels").textContent = `🤖 ${data.text_model} + ${data.image_model}`;
+    KEY_COLOR = (data.key_color || KEY_COLOR).toUpperCase();
+    document.getElementById("pillKeyColor").textContent = `🟩 key: ${KEY_COLOR}`;
+  }catch(e){
+    document.getElementById("pillKey").textContent = "🔑 ключ: ?";
+    document.getElementById("pillModels").textContent = "🤖 модели: ?";
+    document.getElementById("pillKeyColor").textContent = "🟩 key: ?";
+  }
+  resetAll();
+}
+boot();
+
+function resetAll(){
+  layers = [];
+  renderLayers();
+  clearCanvas();
+  setError("");
+  document.getElementById("promptUsed").textContent = "";
+  historyItems = [];
+  renderHistory();
+}
+
+function escapeHtml(s){
+  return String(s)
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+}
+
+function renderLayers(){
+  const container = document.getElementById("layers");
+  container.innerHTML = "";
+
+  if(layers.length === 0){
+    container.innerHTML = `<div class="hint">Слоёв пока нет. Нажми «Разбить сцену».</div>`;
+    return;
+  }
+
+  layers.forEach((layer, i) => {
+    const kindLabel = layer.kind === "background" ? "Фон" : "Объект";
+    const hasImg = !!layer.imageDataUrl;
+
+    const div = document.createElement("div");
+    div.className = "layer";
+    div.innerHTML = `
+      <div class="layerTop">
+        <div>
+          <div class="layerName">${escapeHtml(layer.name || ("Layer "+(i+1)))} <span style="color:#9bb0d6;font-weight:800">· ${kindLabel}</span></div>
+          <small>${escapeHtml(layer.role || "")}</small>
+        </div>
+        <div class="row">
+          <button class="secondary" onclick="improveLayer(${i})">Улучшить</button>
+          <button onclick="regenLayer(${i})">${hasImg ? "Реген" : "Сген"}</button>
+          <button class="danger" onclick="removeLayer(${i})">Удалить</button>
+        </div>
+      </div>
+
+      <textarea onchange="updateLayerPrompt(${i}, this.value)">${escapeHtml(layer.prompt || "")}</textarea>
+
+      <div class="sliders">
+        <div class="sliderBox">
+          <label><span>Scale</span><span>${(layer.scale ?? 1).toFixed(2)}</span></label>
+          <input type="range" min="0.2" max="2.0" step="0.01" value="${layer.scale ?? 1}" oninput="setLayerScale(${i}, this.value)">
+        </div>
+        <div class="sliderBox">
+          <label><span>Opacity</span><span>${Math.round((layer.opacity ?? 1)*100)}%</span></label>
+          <input type="range" min="0" max="1" step="0.01" value="${layer.opacity ?? 1}" oninput="setLayerOpacity(${i}, this.value)">
+        </div>
+        <div class="sliderBox">
+          <label><span>X</span><span>${Math.round(layer.x ?? 0)}</span></label>
+          <input type="range" min="-300" max="300" step="1" value="${layer.x ?? 0}" oninput="setLayerX(${i}, this.value)">
+        </div>
+        <div class="sliderBox">
+          <label><span>Y</span><span>${Math.round(layer.y ?? 0)}</span></label>
+          <input type="range" min="-300" max="300" step="1" value="${layer.y ?? 0}" oninput="setLayerY(${i}, this.value)">
+        </div>
+        <div class="sliderBox" style="grid-column:1 / span 2;">
+          <label><span>Chroma threshold</span><span>${Math.round(layer.chromaThreshold ?? 55)}</span></label>
+          <input type="range" min="10" max="120" step="1" value="${layer.chromaThreshold ?? 55}" oninput="setLayerThreshold(${i}, this.value)">
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function updateLayerPrompt(i, v){ layers[i].prompt = v; }
+function removeLayer(i){ layers.splice(i,1); renderLayers(); renderComposite(); }
+function setLayerScale(i, v){ layers[i].scale = parseFloat(v); renderLayers(); renderComposite(); }
+function setLayerOpacity(i, v){ layers[i].opacity = parseFloat(v); renderLayers(); renderComposite(); }
+function setLayerX(i, v){ layers[i].x = parseFloat(v); renderLayers(); renderComposite(); }
+function setLayerY(i, v){ layers[i].y = parseFloat(v); renderLayers(); renderComposite(); }
+function setLayerThreshold(i, v){ layers[i].chromaThreshold = parseInt(v, 10); renderLayers(); renderComposite(); }
+
+async function decompose(){
+  if(busy) return;
+  setError("");
+  const scene = document.getElementById("sceneInput").value.trim();
+  if(!scene){ setError("Пусто. Напиши сцену."); return; }
+
+  setBusy(true);
+
+  const prompt = `Ты — ассистент по промптам для генерации изображений.
+Разбей описание сцены на СТРОГИЙ JSON МАССИВ (без markdown, без пояснений).
+Схема:
+{
+  "name": "Background|Subject|Props|Lighting|Atmosphere|Style",
+  "role": "коротко что делает слой",
+  "kind": "background|object",
+  "prompt": "детальный промпт для этого слоя"
+}
+Правила:
+- Верни ТОЛЬКО валидный JSON.
+- 4–6 слоёв.
+- Один слой обязательно kind=background.
+- На русском.
+Сцена: ${scene}`;
+
+  const data = await apiPost("/generate_text", {prompt});
+  setBusy(false);
+
+  if(data.error){ setError(data.error); return; }
+
+  try{
+    const arr = JSON.parse((data.text || "").trim());
+    if(!Array.isArray(arr)) throw new Error("JSON не массив");
+
+    layers = arr.map(x => ({
+      name: x.name || "",
+      role: x.role || "",
+      kind: (x.kind || "object").toLowerCase() === "background" ? "background" : "object",
+      prompt: x.prompt || "",
+      imageDataUrl: null,
+      keyColor: KEY_COLOR,
+      x: 0, y: 0,
+      scale: 1.0,
+      opacity: 1.0,
+      chromaThreshold: 55,
+    }));
+
+    // If model forgot background, force one
+    if(!layers.some(l => l.kind === "background")){
+      layers.unshift({
+        name: "Background",
+        role: "фон/сцена",
+        kind: "background",
+        prompt: scene,
+        imageDataUrl: null,
+        keyColor: KEY_COLOR,
+        x: 0, y: 0, scale: 1.0, opacity: 1.0, chromaThreshold: 55
+      });
+    }
+
+    renderLayers();
+  }catch(e){
+    setError("Не смог разобрать JSON от модели.\n\nОтвет модели:\n" + (data.text || ""));
+  }
+}
+
+async function improveWholePrompt(){
+  if(busy) return;
+  setError("");
+  const scene = document.getElementById("sceneInput").value.trim();
+  if(!scene){ setError("Пусто. Напиши сцену."); return; }
+
+  setBusy(true);
+  const data = await apiPost("/generate_text", {
+    prompt: `Улучши промпт для генерации изображения. Сохрани смысл, добавь конкретики (ракурс, свет, оптика/стиль), избегай противоречий. Верни ТОЛЬКО улучшенный промпт одним текстом.\n\nПромпт: ${scene}`
+  });
+  setBusy(false);
+
+  if(data.error){ setError(data.error); return; }
+  document.getElementById("sceneInput").value = (data.text || "").trim();
+}
+
+async function improveLayer(i){
+  if(busy) return;
+  setError("");
+  const p = (layers[i].prompt || "").trim();
+  if(!p){ setError("У слоя пустой промпт."); return; }
+
+  setBusy(true);
+  const data = await apiPost("/generate_text", {
+    prompt: `Улучши промпт для генерации изображения. Сохрани смысл, добавь конкретики (ракурс, свет, стиль), убери воду и противоречия. Верни ТОЛЬКО улучшенный промпт одним текстом.\n\nПромпт: ${p}`
+  });
+  setBusy(false);
+
+  if(data.error){ setError(data.error); return; }
+  layers[i].prompt = (data.text || "").trim();
+  renderLayers();
+}
+
+async function regenLayer(i){
+  if(busy) return;
+  setError("");
+  const layer = layers[i];
+  const p = (layer.prompt || "").trim();
+  if(!p){ setError("У слоя пустой промпт."); return; }
+
+  setBusy(true);
+  const data = await apiPost("/generate_layer", {
+    prompt: p,
+    layer_name: layer.name || ("Layer " + (i+1)),
+    layer_kind: layer.kind,
+    key_color: layer.keyColor || KEY_COLOR
+  });
+  setBusy(false);
+
+  if(data.error){ setError(data.error); return; }
+  if(!data.image_base64){ setError("Нет изображения в ответе."); return; }
+
+  const mime = data.mime_type || "image/png";
+  layer.keyColor = (data.key_color || layer.keyColor || KEY_COLOR).toUpperCase();
+  layer.imageDataUrl = `data:${mime};base64,${data.image_base64}`;
+
+  renderLayers();
+  await renderComposite();
+}
+
+async function generateAll(){
+  if(busy) return;
+  setError("");
+
+  // If no layers, generate a basic set from scene
+  if(layers.length === 0){
+    const scene = document.getElementById("sceneInput").value.trim();
+    if(!scene){ setError("Пусто. Напиши сцену."); return; }
+    layers = [
+      {name:"Background", role:"фон/сцена", kind:"background", prompt:scene, imageDataUrl:null, keyColor:KEY_COLOR, x:0,y:0,scale:1,opacity:1,chromaThreshold:55},
+      {name:"Subject", role:"главный объект", kind:"object", prompt:"Главный объект сцены: " + scene, imageDataUrl:null, keyColor:KEY_COLOR, x:0,y:0,scale:1,opacity:1,chromaThreshold:55},
+      {name:"Atmosphere", role:"эффекты/атмосфера", kind:"object", prompt:"Эффекты и атмосфера (дым, дождь, частицы) для сцены: " + scene, imageDataUrl:null, keyColor:KEY_COLOR, x:0,y:0,scale:1,opacity:0.9,chromaThreshold:55},
+    ];
+    renderLayers();
+  }
+
+  // Generate background first, then objects
+  const bgIndex = layers.findIndex(l => l.kind === "background");
+  if(bgIndex >= 0 && !layers[bgIndex].imageDataUrl){
+    await regenLayer(bgIndex);
+  }
+
+  for(let i=0;i<layers.length;i++){
+    if(i === bgIndex) continue;
+    if(!layers[i].imageDataUrl){
+      await regenLayer(i);
+    }
+  }
+
+  // Save history snapshot
+  const summaryPrompt = layers.map(l => `${l.name}: ${l.prompt}`).join("\n");
+  addToHistory(summaryPrompt);
+}
+
+function clearCanvas(){
+  canvas.width = 1024;
+  canvas.height = 768;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = "rgba(0,0,0,0)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+
+function hexToRgb(hex){
+  const h = hex.replace("#","").trim();
+  const full = h.length === 3 ? h.split("").map(c=>c+c).join("") : h;
+  const n = parseInt(full, 16);
+  return {r:(n>>16)&255, g:(n>>8)&255, b:n&255};
+}
+
+function chromaKeyImageData(img.preview{padding:14px}
 .imgBox{width:100%;aspect-ratio:4/3;border-radius:14px;border:1px dashed rgba(33,48,73,.9);background:rgba(7,10,16,.35);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
 .imgBox img{width:100%;height:100%;object-fit:contain;display:block}
 .overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.35);gap:10px;flex-direction:column;color:var(--text);font-weight:800}
