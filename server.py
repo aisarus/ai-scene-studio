@@ -257,7 +257,7 @@ def generate_layer(req: LayerRequest):
             "key_color": key if kind == "object" else None,
         }
     except Exception as e:
-        return jerror(f"Layer generation failed: {type(e).__name__}: {e}", 500))
+        return jerror(f"Layer generation failed: {type(e).__name__}: {e}", 500)
 
 client = None
 if genai and GEMINI_API_KEY:
