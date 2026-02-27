@@ -1,40 +1,269 @@
 import os
 import base64
-from typing import Optional
+from typing import Optional, Literal, Any, Dict
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from google import genai
-from google.genai import types
 
-# =========================
-# INIT
-# =========================
+# --- Gemini SDK (new) ---
+# pip package usually: google-genai
+# If your requirements.txt uses something else, adjust accordingly.
+try:
+    from google import genai  # type: ignore
+except Exception as e:
+    genai = None  # handled below
 
-app = FastAPI()
+
+# ----------------------------
+# Config
+# ----------------------------
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("API_KEY")
+
+TEXT_MODEL = os.getenv("TEXT_MODEL", "gemini-2.0-flash")
+IMAGE_MODEL = os.getenv("IMAGE_MODEL", "gemini-2.0-flash-image-generation")
+
+# Chroma key color for object layer background (solid color)
+KEY_COLOR_DEFAULT = os.getenv("KEY_COLOR", "#00FF00")  # bright green by default
+
+
+# ----------------------------
+# App
+# ----------------------------
+app = FastAPI(title="AI Scene Studio API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # tighten later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+client = None
+if genai is not None and GEMINI_API_KEY:
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEY)
+    except Exception:
+        client = None
 
-if not GEMINI_API_KEY:
-    raise RuntimeError("GEMINI_API_KEY not set")
 
-client = genai.Client(api_key=GEMINI_API_KEY)
-
-# =========================
-# MODELS
-# =========================
-
+# ----------------------------
+# Models
+# ----------------------------
 class TextRequest(BaseModel):
+    prompt: str
+
+
+class ImageRequest(BaseModel):
+    prompt: str
+
+
+class LayerRequest(BaseModel):
+    prompt: str
+    layer_kind: Literal["background", "object"] = "background"
+    layer_name: Optional[str] = None
+    key_color: Optional[str] = None  # used only for object layer
+
+
+# ----------------------------
+# Helpers
+# ----------------------------
+def _err(msg: str) -> Dict[str, str]:
+    return {"error": msg}
+
+
+def _extract_inline_image(resp: Any) -> Optional[Dict[str, str]]:
+    """
+    Tries to extract inline image bytes from Gemini response and return:
+    {"image_base64": "...", "mime_type": "image/png"}
+    Supports multiple possible response shapes.
+    """
+    # 1) Preferred path: resp.candidates[].content.parts[].inline_data
+    candidates = getattr(resp, "candidates", None) or []
+    for cand in candidates:
+        content = getattr(cand, "content", None)
+        parts = getattr(content, "parts", None) or []
+        for part in parts:
+            inline = getattr(part, "inline_data", None)
+            if inline and getattr(inline, "data", None):
+                data = inline.data
+                if isinstance(data, (bytes, bytearray)):
+                    data = base64.b64encode(data).decode("utf-8")
+                mime = getattr(inline, "mime_type", "image/png")
+                return {"image_base64": str(data), "mime_type": str(mime)}
+
+            # Some variants store it directly
+            inline2 = getattr(part, "inlineData", None)
+            if inline2 and getattr(inline2, "data", None):
+                data = inline2.data
+                if isinstance(data, (bytes, bytearray)):
+                    data = base64.b64encode(data).decode("utf-8")
+                mime = getattr(inline2, "mime_type", "image/png")
+                return {"image_base64": str(data), "mime_type": str(mime)}
+
+    # 2) Alternative: resp.parts[] (rare)
+    parts2 = getattr(resp, "parts", None) or []
+    for part in parts2:
+        inline = getattr(part, "inline_data", None)
+        if inline and getattr(inline, "data", None):
+            data = inline.data
+            if isinstance(data, (bytes, bytearray)):
+                data = base64.b64encode(data).decode("utf-8")
+            mime = getattr(inline, "mime_type", "image/png")
+            return {"image_base64": str(data), "mime_type": str(mime)}
+
+    return None
+
+
+def _ensure_client():
+    if client is None:
+        return _err("GEMINI_API_KEY is not set (or Gemini client init failed). Set it in Render Environment Variables.")
+    return None
+
+
+# ----------------------------
+# Routes
+# ----------------------------
+@app.get("/health")
+def health():
+    return {"ok": True}
+
+
+@app.post("/generate_text")
+def generate_text(req: TextRequest):
+    c_err = _ensure_client()
+    if c_err:
+        return c_err
+
+    prompt = (req.prompt or "").strip()
+    if not prompt:
+        return _err("Empty prompt.")
+
+    try:
+        resp = client.models.generate_content(
+            model=TEXT_MODEL,
+            contents=[prompt],
+        )
+
+        # Common: resp.text
+        text = getattr(resp, "text", None)
+        if text:
+            return {"text": str(text)}
+
+        # Fallback: candidates/parts
+        out_parts = []
+        candidates = getattr(resp, "candidates", None) or []
+        for cand in candidates:
+            content = getattr(cand, "content", None)
+            parts = getattr(content, "parts", None) or []
+            for p in parts:
+                t = getattr(p, "text", None)
+                if t:
+                    out_parts.append(str(t))
+
+        return {"text": "\n".join(out_parts).strip()}
+
+    except Exception as e:
+        return _err(f"Text generation failed: {type(e).__name__}: {e}")
+
+
+@app.post("/generate_image")
+def generate_image(req: ImageRequest):
+    c_err = _ensure_client()
+    if c_err:
+        return c_err
+
+    prompt = (req.prompt or "").strip()
+    if not prompt:
+        return _err("Empty prompt.")
+
+    try:
+        resp = client.models.generate_content(
+            model=IMAGE_MODEL,
+            contents=[prompt],
+        )
+
+        img = _extract_inline_image(resp)
+        if img:
+            return img
+
+        return _err("Image not generated (no inline_data in response). Try simplifying the prompt.")
+
+    except Exception as e:
+        return _err(f"Image generation failed: {type(e).__name__}: {e}")
+
+
+@app.post("/generate_layer")
+def generate_layer(req: LayerRequest):
+    """
+    Pseudo-layer generation:
+      - background: prompt + constraints (no subject in foreground)
+      - object: prompt + strict rules (single subject, solid chroma key background)
+    """
+    c_err = _ensure_client()
+    if c_err:
+        return c_err
+
+    base_prompt = (req.prompt or "").strip()
+    if not base_prompt:
+        return _err("Empty prompt.")
+
+    layer_kind = (req.layer_kind or "background").lower().strip()
+    key_color = (req.key_color or KEY_COLOR_DEFAULT).strip()
+
+    if layer_kind == "background":
+        final_prompt = (
+            f"{base_prompt}\n\n"
+            "RULES:\n"
+            "- Background-only image.\n"
+            "- No main subject/character in foreground.\n"
+            "- High quality, coherent lighting.\n"
+            "- No text, no watermark.\n"
+        )
+    else:
+        # object
+        final_prompt = (
+            f"{base_prompt}\n\n"
+            "STRICT RULES:\n"
+            "- Exactly ONE main object/character only.\n"
+            "- Place it centered, fully visible (not cropped).\n"
+            f"- Background must be a perfectly solid flat color {key_color} (no gradient, no shadows on background).\n"
+            "- No additional objects, no scenery.\n"
+            "- No text, no watermark.\n"
+            "- Keep edges clean.\n"
+        )
+
+    try:
+        resp = client.models.generate_content(
+            model=IMAGE_MODEL,
+            contents=[final_prompt],
+        )
+
+        img = _extract_inline_image(resp)
+        if img:
+            # enrich response with layer metadata
+            return {
+                "image_base64": img["image_base64"],
+                "mime_type": img.get("mime_type", "image/png"),
+                "layer_kind": layer_kind,
+                "layer_name": req.layer_name,
+                "key_color": key_color,
+                "used_prompt": final_prompt,  # helps debug what was sent
+            }
+
+        return _err("Layer image not generated (no inline_data in response). Try simplifying the prompt.")
+
+    except Exception as e:
+        return _err(f"Layer generation failed: {type(e).__name__}: {e}")
+
+
+# ----------------------------
+# Static hosting (KEEP LAST)
+# ----------------------------
+# This MUST be the last executable line(s) so it never glues to a def.
+app.mount("/", StaticFiles(directory="static", html=True), name="static")class TextRequest(BaseModel):
     prompt: str
 
 
