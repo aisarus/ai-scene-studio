@@ -525,4 +525,6 @@ def generate_image(req: ImageRequest):
         return {"error": "Image not generated (no inline_data in response). Try simplifying the prompt."}
     except Exception as e:
         return {"error": f"Image generation failed: {type(e).__name__}: {e}"}
+       
+        
         app.mount("/", StaticFiles(directory="static", html=True), name="static")
