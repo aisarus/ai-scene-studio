@@ -1,40 +1,2016 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>AI Scene Studio</title>
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#0b0f17;color:#e9eefc}
-    .wrap{max-width:980px;margin:0 auto;padding:20px}
-    .card{background:#121a2a;border:1px solid #22304f;border-radius:14px;padding:16px;margin:12px 0;box-shadow:0 8px 30px rgba(0,0,0,.25)}
-    h1{font-size:20px;margin:0 0 6px}
-    .muted{opacity:.7;font-size:13px}
-    textarea,input,select,button{width:100%;box-sizing:border-box;border-radius:12px;border:1px solid #2a3b63;background:#0e1524;color:#e9eefc;padding:10px;font-size:14px}
-    textarea{min-height:110px;resize:vertical}
-    button{cursor:pointer;background:#2b63ff;border-color:#2b63ff;font-weight:600}
-    button:disabled{opacity:.6;cursor:not-allowed}
-    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-    .out{white-space:pre-wrap;background:#0c1220;border:1px solid #22304f;border-radius:12px;padding:12px;min-height:60px}
-    img{max-width:100%;border-radius:12px;border:1px solid #22304f}
-    .pill{display:inline-block;padding:4px 10px;border:1px solid #22304f;border-radius:999px;font-size:12px;opacity:.8;margin-left:8px}
-    .err{color:#ff6b6b}
+    :root{
+      --bg:#070A12;
+      --bg2:#0A1124;
+      --panel:#0E1833;
+      --panel2:#0B1328;
+      --card:#0D1731;
+      --line:rgba(255,255,255,.08);
+      --line2:rgba(255,255,255,.12);
+      --text:#EAF0FF;
+      --muted:rgba(234,240,255,.66);
+      --muted2:rgba(234,240,255,.42);
+      --accent:#4C7DFF;
+      --accent2:#8AA8FF;
+      --ok:#5BE49B;
+      --warn:#FFD166;
+      --bad:#FF5C7A;
+      --shadow:0 18px 45px rgba(0,0,0,.45);
+      --shadow2:0 10px 26px rgba(0,0,0,.35);
+      --radius:18px;
+      --radius2:14px;
+      --radius3:12px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+      --glass: rgba(13,23,49,.76);
+      --glass2: rgba(10,17,36,.72);
+      --blur: blur(14px);
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; margin:0; font-family:var(--sans); background: radial-gradient(1200px 800px at 20% 10%, rgba(76,125,255,.18), transparent 55%),
+                                                      radial-gradient(1000px 700px at 85% 20%, rgba(91,228,155,.12), transparent 55%),
+                                                      radial-gradient(900px 700px at 50% 90%, rgba(255,92,122,.10), transparent 60%),
+                                                      linear-gradient(180deg, var(--bg), var(--bg2));
+               color:var(--text);
+    }
+
+    /* Subtle starfield */
+    body:before{
+      content:"";
+      position:fixed; inset:0;
+      background-image:
+        radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,.20) 0, rgba(255,255,255,0) 2px),
+        radial-gradient(1px 1px at 40% 70%, rgba(255,255,255,.16) 0, rgba(255,255,255,0) 2px),
+        radial-gradient(1px 1px at 85% 35%, rgba(255,255,255,.14) 0, rgba(255,255,255,0) 2px),
+        radial-gradient(1px 1px at 70% 80%, rgba(255,255,255,.12) 0, rgba(255,255,255,0) 2px),
+        radial-gradient(1px 1px at 25% 90%, rgba(255,255,255,.10) 0, rgba(255,255,255,0) 2px);
+      opacity:.55;
+      pointer-events:none;
+    }
+
+    .app{
+      max-width:1200px;
+      margin:0 auto;
+      padding:16px 14px 26px;
+    }
+
+    .topbar{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      justify-content:space-between;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background: linear-gradient(180deg, rgba(13,23,49,.72), rgba(10,17,36,.55));
+      backdrop-filter: var(--blur);
+      box-shadow: var(--shadow2);
+      position:sticky;
+      top:10px;
+      z-index:40;
+    }
+
+    .brand{
+      display:flex; gap:10px; align-items:center;
+      min-width:0;
+    }
+    .logo{
+      width:38px; height:38px; border-radius:12px;
+      background: radial-gradient(12px 12px at 30% 30%, rgba(255,255,255,.36), transparent 60%),
+                  radial-gradient(18px 18px at 70% 65%, rgba(76,125,255,.55), transparent 62%),
+                  linear-gradient(135deg, rgba(76,125,255,.35), rgba(91,228,155,.12));
+      border:1px solid rgba(255,255,255,.10);
+      box-shadow: 0 10px 20px rgba(0,0,0,.30);
+    }
+    .brand .meta{
+      display:flex; flex-direction:column;
+      min-width:0;
+    }
+    .brand .title{
+      font-weight:820;
+      letter-spacing:.2px;
+      font-size:14px;
+      line-height:1.1;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .brand .subtitle{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.1;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      margin-top:3px;
+    }
+
+    .top-actions{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+
+    .pill{
+      display:flex; gap:8px; align-items:center;
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      color:var(--muted);
+      font-size:12px;
+      white-space:nowrap;
+    }
+    .dot{
+      width:8px; height:8px; border-radius:999px;
+      background: var(--bad);
+      box-shadow: 0 0 0 3px rgba(255,92,122,.15);
+    }
+    .dot.ok{
+      background: var(--ok);
+      box-shadow: 0 0 0 3px rgba(91,228,155,.14);
+    }
+    .dot.warn{
+      background: var(--warn);
+      box-shadow: 0 0 0 3px rgba(255,209,102,.14);
+    }
+
+    .btn{
+      appearance:none;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      font-weight:700;
+      cursor:pointer;
+      transition: transform .06s ease, border-color .15s ease, background .15s ease;
+      user-select:none;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      font-size:13px;
+    }
+    .btn:active{ transform: scale(.98); }
+    .btn:hover{ border-color: rgba(255,255,255,.18); background: rgba(255,255,255,.06); }
+    .btn.primary{
+      background: linear-gradient(180deg, rgba(76,125,255,.95), rgba(76,125,255,.70));
+      border-color: rgba(76,125,255,.70);
+      box-shadow: 0 12px 24px rgba(76,125,255,.20);
+    }
+    .btn.primary:hover{
+      background: linear-gradient(180deg, rgba(90,136,255,.98), rgba(76,125,255,.78));
+      border-color: rgba(140,168,255,.65);
+    }
+    .btn.ghost{
+      background: transparent;
+      border-color: rgba(255,255,255,.10);
+    }
+    .btn.bad{
+      background: rgba(255,92,122,.10);
+      border-color: rgba(255,92,122,.30);
+      color: rgba(255,92,122,.95);
+    }
+    .btn.small{
+      padding:8px 10px;
+      border-radius:10px;
+      font-size:12px;
+    }
+    .btn.icon{
+      width:40px; height:40px;
+      justify-content:center;
+      border-radius:12px;
+      padding:0;
+    }
+
+    .grid{
+      margin-top:14px;
+      display:grid;
+      gap:14px;
+      grid-template-columns: 420px 1fr;
+      align-items:start;
+    }
+    @media (max-width: 980px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+
+    .panel{
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background: linear-gradient(180deg, rgba(13,23,49,.75), rgba(10,17,36,.60));
+      backdrop-filter: var(--blur);
+      box-shadow: var(--shadow2);
+      overflow:hidden;
+    }
+    .panel .hd{
+      padding:12px 12px 10px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      border-bottom:1px solid var(--line);
+      background: rgba(255,255,255,.02);
+    }
+    .panel .hd .h{
+      display:flex; flex-direction:column; gap:2px;
+    }
+    .panel .hd .h strong{
+      font-size:13px;
+      letter-spacing:.2px;
+    }
+    .panel .hd .h span{
+      font-size:12px; color:var(--muted);
+    }
+    .panel .bd{
+      padding:12px;
+    }
+
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      margin-bottom:12px;
+    }
+    .labelrow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .label{
+      font-size:12px;
+      color:var(--muted);
+    }
+    .hint{
+      font-size:12px;
+      color:var(--muted2);
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    .hint code{ font-family:var(--mono); font-size:11px; color:rgba(234,240,255,.75); }
+
+    textarea, input[type="text"], input[type="number"]{
+      width:100%;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.20);
+      color: var(--text);
+      outline:none;
+      font-size:13px;
+      line-height:1.3;
+    }
+    textarea{
+      min-height:120px;
+      resize:vertical;
+    }
+    textarea:focus, input:focus{
+      border-color: rgba(76,125,255,.55);
+      box-shadow: 0 0 0 3px rgba(76,125,255,.18);
+    }
+
+    .row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .row > *{ flex:1; min-width:140px; }
+
+    .seg{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .chip{
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      padding:8px 10px;
+      border-radius:999px;
+      font-size:12px;
+      color: var(--muted);
+      cursor:pointer;
+      user-select:none;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+    }
+    .chip.active{
+      border-color: rgba(76,125,255,.55);
+      background: rgba(76,125,255,.12);
+      color: rgba(234,240,255,.92);
+    }
+
+    .mini{
+      font-size:12px;
+      color: var(--muted);
+      line-height:1.25;
+    }
+
+    .hr{
+      height:1px;
+      background: var(--line);
+      margin:12px 0;
+    }
+
+    .kv{
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap:8px;
+      font-size:12px;
+      color: var(--muted);
+      align-items:center;
+    }
+    .kv b{ color: rgba(234,240,255,.92); font-weight:800; }
+
+    .toast{
+      position:fixed;
+      left:50%;
+      bottom:16px;
+      transform: translateX(-50%);
+      background: rgba(13,23,49,.92);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:14px;
+      padding:10px 12px;
+      max-width:min(760px, calc(100vw - 20px));
+      box-shadow: var(--shadow);
+      z-index:999;
+      display:none;
+      gap:10px;
+      align-items:flex-start;
+      backdrop-filter: blur(12px);
+    }
+    .toast.show{ display:flex; }
+    .toast .t{
+      font-size:13px;
+      color: rgba(234,240,255,.92);
+      line-height:1.25;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+    .toast .x{
+      margin-left:auto;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+      color:var(--text);
+      border-radius:10px;
+      padding:6px 8px;
+      cursor:pointer;
+      font-weight:900;
+    }
+
+    /* Canvas / Viewer */
+    .stage{
+      position:relative;
+      min-height:520px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .stage-top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .stage-top .left{
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    }
+    .badge{
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background: rgba(255,255,255,.04);
+      font-size:12px;
+      color: var(--muted);
+      display:flex;
+      align-items:center;
+      gap:8px;
+      white-space:nowrap;
+    }
+    .badge strong{ color: rgba(234,240,255,.92); font-weight:900; }
+
+    .canvas-wrap{
+      position:relative;
+      border-radius: var(--radius);
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.10);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0)),
+        radial-gradient(800px 450px at 50% 20%, rgba(76,125,255,.12), transparent 60%),
+        rgba(0,0,0,.22);
+      box-shadow: var(--shadow);
+      min-height:420px;
+      display:grid;
+      place-items:center;
+    }
+
+    canvas{
+      width:100%;
+      height:auto;
+      display:block;
+      max-height: 70vh;
+      image-rendering: auto;
+    }
+
+    .overlay-tools{
+      position:absolute;
+      inset: 12px 12px auto 12px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      pointer-events:none;
+    }
+    .overlay-tools .grp{
+      display:flex;
+      gap:8px;
+      pointer-events:auto;
+    }
+
+    .spinner{
+      width:26px; height:26px;
+      border-radius:999px;
+      border:3px solid rgba(255,255,255,.18);
+      border-top-color: rgba(76,125,255,.95);
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin{ to{ transform: rotate(360deg); } }
+
+    .busy{
+      position:absolute;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      flex-direction:column;
+      gap:10px;
+      background: rgba(0,0,0,.30);
+      backdrop-filter: blur(6px);
+      z-index:20;
+      color: rgba(234,240,255,.92);
+      text-align:center;
+      padding:18px;
+    }
+    .busy.show{ display:flex; }
+
+    .busy .small{
+      font-size:12px;
+      color: var(--muted);
+      max-width:520px;
+      line-height:1.3;
+    }
+
+    /* Layers */
+    .layerlist{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .layercard{
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: var(--radius2);
+      background: rgba(255,255,255,.03);
+      overflow:hidden;
+    }
+    .layercard .lh{
+      padding:10px 10px 8px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+    }
+    .layercard .lh .name{
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+      min-width:0;
+    }
+    .layercard .lh .name strong{
+      font-size:12.5px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .layercard .lh .name span{
+      font-size:11.5px;
+      color: var(--muted);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .layercard .lb{
+      padding:10px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .controls{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+    }
+    @media (max-width: 520px){
+      .controls{ grid-template-columns: 1fr; }
+    }
+    .ctrl{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:12px;
+      padding:9px;
+      background: rgba(0,0,0,.15);
+    }
+    .ctrl .k{
+      font-size:11px;
+      color: var(--muted2);
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+    }
+    .ctrl .k b{
+      font-family: var(--mono);
+      font-size:11px;
+      color: rgba(234,240,255,.78);
+      font-weight:800;
+    }
+    input[type="range"]{ width:100%; }
+    .layer-actions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+      margin-top:2px;
+    }
+
+    /* Fullscreen modal */
+    .modal{
+      position:fixed;
+      inset:0;
+      background: rgba(0,0,0,.60);
+      backdrop-filter: blur(10px);
+      z-index:1000;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:14px;
+    }
+    .modal.show{ display:flex; }
+    .modal .box{
+      width:min(1100px, 100%);
+      border-radius: 18px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(10,17,36,.72);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .modal .mh{
+      padding:10px;
+      border-bottom:1px solid rgba(255,255,255,.10);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .modal .mh .ttl{
+      font-weight:900;
+      font-size:13px;
+      color: rgba(234,240,255,.92);
+      display:flex;
+      gap:10px;
+      align-items:center;
+      min-width:0;
+    }
+    .modal .mh .ttl span{
+      color: var(--muted);
+      font-weight:600;
+      font-size:12px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .modal .mb{
+      padding:10px;
+      background: rgba(0,0,0,.18);
+      display:grid;
+      place-items:center;
+    }
+    .modal img{
+      max-width:100%;
+      max-height: 78vh;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.25);
+    }
+
+    /* History */
+    .history{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .histitem{
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.03);
+      border-radius: 14px;
+      padding:10px;
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+    }
+    .thumb{
+      width:56px; height:56px;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.25);
+      object-fit: cover;
+      flex:0 0 auto;
+    }
+    .histmeta{
+      min-width:0;
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      flex:1;
+    }
+    .histmeta .p{
+      font-size:12px;
+      color: rgba(234,240,255,.88);
+      line-height:1.25;
+      overflow:hidden;
+      display:-webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      word-break: break-word;
+    }
+    .histmeta .s{
+      font-size:11px;
+      color: var(--muted2);
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .histmeta .s code{ font-family: var(--mono); font-size:11px; color: rgba(234,240,255,.62); }
+
+    /* Small helpers */
+    .muted{ color: var(--muted); }
+    .mono{ font-family: var(--mono); }
+    .right{ margin-left:auto; }
+
+    /* Accessibility tweaks */
+    button:focus, .chip:focus{ outline:none; box-shadow: 0 0 0 3px rgba(76,125,255,.18); }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
-      <h1>AI Scene Studio <span class="pill">FastAPI + Render + Gemini</span></h1>
-      <div class="muted">Если снова упадёт, значит это не пробелы. Уже прогресс.</div>
-      <div class="muted">Health: <span id="health">…</span></div>
+  <div class="app">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div class="meta">
+          <div class="title">AI Scene Studio</div>
+          <div class="subtitle">Псевдо-слои: фон отдельно, объект отдельно (хромакей) → сборка на canvas</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div class="pill" title="Статус сервера (пинг)">
+          <span class="dot" id="statusDot"></span>
+          <span id="statusText">нет связи</span>
+        </div>
+        <button class="btn ghost icon" id="btnHelp" title="Подсказки">
+          <span aria-hidden="true">?</span>
+        </button>
+        <button class="btn ghost" id="btnExport" title="Скачать собранную сцену как PNG">
+          ⬇️ Экспорт PNG
+        </button>
+        <button class="btn bad" id="btnReset" title="Сбросить всё">
+          🧹 Сброс
+        </button>
+      </div>
     </div>
 
-    <div class="card">
-      <h1>Generate Text</h1>
-      <textarea id="textPrompt" placeholder="Напиши сцену про…"></textarea>
-      <div style="height:10px"></div>
-      <button id="btnText">Сгенерировать текст</button>
-      <div style="height:12px"></div>
+    <div class="grid">
+      <!-- LEFT: controls -->
+      <div class="panel">
+        <div class="hd">
+          <div class="h">
+            <strong>Промпты и генерация</strong>
+            <span>Пишешь сцену один раз, дальше режем на слои и улучшаем отдельно</span>
+          </div>
+          <button class="btn small" id="btnPing" title="Проверить сервер">🔌 Пинг</button>
+        </div>
+        <div class="bd">
+          <div class="field">
+            <div class="labelrow">
+              <div class="label">Сцена (единый промпт)</div>
+              <div class="hint"><span>поддержка:</span> <code>фон + объект</code> <span class="muted2">или</span> <code>только фон</code></div>
+            </div>
+            <textarea id="scenePrompt" placeholder="Например: Кролик бежит по лугу на фоне гор и заката. Стиль: мягкий, иллюстрация, высокий контраст."></textarea>
+          </div>
+
+          <div class="row">
+            <div class="field" style="margin-bottom:0;">
+              <div class="labelrow">
+                <div class="label">Стиль / пресет</div>
+                <div class="hint">не обяз.</div>
+              </div>
+              <div class="seg" id="stylePresets">
+                <div class="chip active" data-style="clean">Чисто</div>
+                <div class="chip" data-style="cinematic">Кино</div>
+                <div class="chip" data-style="illustration">Иллюстрация</div>
+                <div class="chip" data-style="pixel">Пиксель</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="row">
+            <div class="field" style="margin-bottom:0;">
+              <div class="labelrow">
+                <div class="label">Оценка цены промпта</div>
+                <div class="hint"><span class="muted2">приблизительно, без магии</span></div>
+              </div>
+              <div class="kv">
+                <span>Символов</span><b id="statChars">0</b>
+                <span>Слов</span><b id="statWords">0</b>
+                <span>Оценка токенов</span><b id="statTokens">0</b>
+                <span>Цена (USD)</span><b id="statUSD">$0.0000</b>
+                <span>Цена (₪)</span><b id="statILS">₪0.0000</b>
+              </div>
+              <div class="mini" style="margin-top:8px;">
+                Модель/прайс у всех разные. Тут просто счётчик: <span class="mono">tokens ≈ words × 1.33</span> и тариф из настроек ниже.
+              </div>
+            </div>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="row">
+            <div class="field" style="margin-bottom:0;">
+              <div class="labelrow">
+                <div class="label">Тариф (за 1M токенов)</div>
+                <div class="hint"><span>по умолчанию</span> <code>$1.50</code></div>
+              </div>
+              <div class="row">
+                <input id="pricePerMTokens" type="number" step="0.01" min="0" value="1.50" />
+                <input id="usdToIls" type="number" step="0.01" min="0" value="3.70" title="Курс USD→₪" />
+              </div>
+              <div class="mini">Левое: $ за 1,000,000 токенов. Правое: курс USD→₪.</div>
+            </div>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="row">
+            <button class="btn primary" id="btnGenerateScene">✨ Разбить сцену и сгенерировать</button>
+            <button class="btn" id="btnImproveScene">🧠 Улучшить промпт сцены</button>
+          </div>
+
+          <div class="mini" style="margin-top:10px;">
+            Стандартная схема:
+            <ol style="margin:8px 0 0 18px; padding:0; color:var(--muted);">
+              <li>Генерим <b>фон</b> отдельно</li>
+              <li>Генерим <b>объект</b> на идеально зелёном фоне (хромакей)</li>
+              <li>Автоматически вырезаем зелёный и складываем на canvas</li>
+            </ol>
+          </div>
+
+          <div class="hr"></div>
+
+          <div class="field">
+            <div class="labelrow">
+              <div class="label">Логи / ошибки</div>
+              <div class="hint"><span>для боли и славы</span></div>
+            </div>
+            <textarea id="logBox" style="min-height:120px; font-family:var(--mono); font-size:11px;" readonly></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: stage -->
+      <div class="panel">
+        <div class="hd">
+          <div class="h">
+            <strong>Сцена</strong>
+            <span>Canvas-композитор + управление слоями</span>
+          </div>
+          <div class="row" style="gap:8px; flex-wrap:nowrap;">
+            <button class="btn small" id="btnFullscreen">⛶ Полный экран</button>
+            <button class="btn small" id="btnSnap">📸 В историю</button>
+          </div>
+        </div>
+
+        <div class="bd">
+          <div class="stage">
+            <div class="stage-top">
+              <div class="left">
+                <div class="badge"><strong id="badgeW">1024</strong><span>×</span><strong id="badgeH">1024</strong><span class="muted">px</span></div>
+                <div class="badge"><span>Хромакей:</span><strong class="mono" id="badgeKey">#00FF00</strong></div>
+                <div class="badge"><span>Слоёв:</span><strong id="badgeLayers">0</strong></div>
+              </div>
+              <div class="right" style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn small" id="btnRecompose">🧩 Пересобрать</button>
+                <button class="btn small" id="btnFit">🪄 Подогнать</button>
+              </div>
+            </div>
+
+            <div class="canvas-wrap" id="canvasWrap">
+              <div class="overlay-tools">
+                <div class="grp">
+                  <button class="btn icon" id="btnZoomOut" title="Уменьшить">−</button>
+                  <button class="btn icon" id="btnZoomIn" title="Увеличить">+</button>
+                </div>
+                <div class="grp">
+                  <button class="btn icon" id="btnToggleGrid" title="Сетка">▦</button>
+                  <button class="btn icon" id="btnToggleBg" title="Фон предпросмотра">⬚</button>
+                </div>
+              </div>
+
+              <div class="busy" id="busy">
+                <div class="spinner"></div>
+                <div><b id="busyTitle">Генерация…</b></div>
+                <div class="small" id="busyText">Если модель недоступна, будет 404 и жизнь снова победит.</div>
+              </div>
+
+              <canvas id="stageCanvas" width="1024" height="1024"></canvas>
+            </div>
+
+            <div class="panel" style="box-shadow:none;">
+              <div class="hd">
+                <div class="h">
+                  <strong>Слои</strong>
+                  <span>Фон и объект, плюс всё что ты захочешь добавить</span>
+                </div>
+                <div class="row" style="gap:8px; flex-wrap:nowrap;">
+                  <button class="btn small" id="btnAddLayer">➕ Добавить слой</button>
+                  <button class="btn small" id="btnGenLayer">🧱 Генерировать слой</button>
+                </div>
+              </div>
+              <div class="bd">
+                <div class="layerlist" id="layerList"></div>
+                <div class="mini" id="noLayersHint" style="margin-top:10px; color:var(--muted);">
+                  Пока слоёв нет. Нажми <b>“Разбить сцену и сгенерировать”</b> или добавь слой вручную.
+                </div>
+              </div>
+            </div>
+
+            <div class="panel" style="box-shadow:none;">
+              <div class="hd">
+                <div class="h">
+                  <strong>История</strong>
+                  <span>Снимки сцены, чтобы не потерять удачный результат</span>
+                </div>
+                <button class="btn small" id="btnClearHistory">🗑 Очистить</button>
+              </div>
+              <div class="bd">
+                <div class="history" id="history"></div>
+                <div class="mini" id="noHistoryHint" style="margin-top:10px; color:var(--muted);">
+                  Снимков нет. Жми <b>“В историю”</b>, когда будет что сохранять.
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast">
+      <div class="t" id="toastText"></div>
+      <button class="x" id="toastClose">✕</button>
+    </div>
+
+    <div class="modal" id="modal">
+      <div class="box">
+        <div class="mh">
+          <div class="ttl">
+            <span>Просмотр</span>
+            <span id="modalMeta"></span>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn small" id="btnModalDownload">⬇️ PNG</button>
+            <button class="btn small" id="btnModalClose">Закрыть</button>
+          </div>
+        </div>
+        <div class="mb">
+          <img id="modalImg" alt="Preview" />
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+  (() => {
+    // -------------------------
+    // Utilities
+    // -------------------------
+    const $ = (id) => document.getElementById(id);
+    const logBox = $("logBox");
+    const toast = $("toast");
+    const toastText = $("toastText");
+    const statusDot = $("statusDot");
+    const statusText = $("statusText");
+
+    function nowStr(){
+      const d = new Date();
+      return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    }
+    function log(msg, type="info"){
+      const prefix = `[${nowStr()}] ${type.toUpperCase()}: `;
+      logBox.value = prefix + msg + "\n" + logBox.value;
+    }
+    function showToast(msg){
+      toastText.textContent = msg;
+      toast.classList.add("show");
+      setTimeout(()=> toast.classList.remove("show"), 4200);
+    }
+    $("toastClose").addEventListener("click", () => toast.classList.remove("show"));
+
+    function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+
+    function hexToRgb(hex){
+      const h = hex.replace("#","").trim();
+      const v = h.length === 3 ? h.split("").map(c=>c+c).join("") : h;
+      const n = parseInt(v, 16);
+      return { r: (n>>16)&255, g: (n>>8)&255, b: n&255 };
+    }
+
+    function estimateStats(text){
+      const t = (text || "").trim();
+      const chars = t.length;
+      const words = t ? t.split(/\s+/).filter(Boolean).length : 0;
+      // rough token estimate: 1 token ≈ 0.75 words -> tokens ≈ words * 1.33
+      const tokens = Math.round(words * 1.33);
+      return { chars, words, tokens };
+    }
+
+    // Base64 helpers
+    function dataUrlFromBase64(b64, mime){
+      return `data:${mime || "image/png"};base64,${b64}`;
+    }
+
+    function downloadDataUrl(dataUrl, filename){
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
+    // API
+    async function postJSON(url, body){
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {})
+      });
+      const ct = res.headers.get("content-type") || "";
+      let payload = null;
+      if (ct.includes("application/json")){
+        payload = await res.json().catch(()=>null);
+      } else {
+        const txt = await res.text().catch(()=> "");
+        payload = { error: txt || `Non-JSON response (${res.status})` };
+      }
+      if (!res.ok){
+        const msg = payload && payload.error ? payload.error : `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+      return payload;
+    }
+
+    async function ping(){
+      // We don't assume /health exists. We'll try GET / then POST /generate_text with tiny prompt.
+      try{
+        statusDot.className = "dot warn";
+        statusText.textContent = "проверка…";
+        await fetch("/", { method:"GET" }).catch(()=>{});
+        statusDot.className = "dot ok";
+        statusText.textContent = "онлайн";
+        return true;
+      }catch(e){
+        statusDot.className = "dot";
+        statusText.textContent = "нет связи";
+        return false;
+      }
+    }
+
+    // -------------------------
+    // State
+    // -------------------------
+    const state = {
+      canvasW: 1024,
+      canvasH: 1024,
+      zoom: 1,
+      showGrid: false,
+      darkPreviewBg: true,
+      keyColor: "#00FF00",
+      keyThreshold: 55, // 0..255 distance threshold in RGB-ish metric
+      activeStyle: "clean",
+      layers: [],
+      history: []
+    };
+
+    // Layer schema:
+    // { id, kind: "background"|"subject"|"custom", name, prompt, image:HTMLImageElement|null, imageUrl, mime, keyColor, keyThreshold, x,y, scale, opacity, visible, useChroma, chromaThreshold }
+
+    function uid(){
+      return Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
+    }
+
+    // -------------------------
+    // Canvas rendering
+    // -------------------------
+    const canvas = $("stageCanvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+    function resizeCanvas(w, h){
+      state.canvasW = w; state.canvasH = h;
+      canvas.width = w; canvas.height = h;
+      $("badgeW").textContent = w;
+      $("badgeH").textContent = h;
+      recompose();
+    }
+
+    function drawCheckerboard(){
+      const size = 28;
+      for (let y=0; y<canvas.height; y+=size){
+        for (let x=0; x<canvas.width; x+=size){
+          const odd = ((x/size)|0 + (y/size)|0) % 2;
+          ctx.fillStyle = odd ? "rgba(255,255,255,.04)" : "rgba(255,255,255,.02)";
+          ctx.fillRect(x,y,size,size);
+        }
+      }
+    }
+
+    function drawGrid(){
+      const step = 64;
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,.07)";
+      ctx.lineWidth = 1;
+      for (let x=0; x<=canvas.width; x+=step){
+        ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke();
+      }
+      for (let y=0; y<=canvas.height; y+=step){
+        ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function applyChromaToImage(img, keyHex, threshold){
+      // Returns an offscreen canvas with chroma applied (alpha)
+      const off = document.createElement("canvas");
+      off.width = img.naturalWidth || img.width;
+      off.height = img.naturalHeight || img.height;
+      const octx = off.getContext("2d", { willReadFrequently: true });
+      octx.drawImage(img, 0, 0, off.width, off.height);
+
+      const {r:kr,g:kg,b:kb} = hexToRgb(keyHex);
+      const imgData = octx.getImageData(0,0,off.width, off.height);
+      const d = imgData.data;
+
+      // Simple distance in RGB space (cheap).
+      for (let i=0; i<d.length; i+=4){
+        const r = d[i], g = d[i+1], b = d[i+2];
+        const dr = r-kr, dg = g-kg, db = b-kb;
+        const dist = Math.sqrt(dr*dr + dg*dg + db*db);
+        if (dist <= threshold){
+          d[i+3] = 0;
+        }
+      }
+      octx.putImageData(imgData, 0, 0);
+      return off;
+    }
+
+    function recompose(){
+      // Clear
+      ctx.clearRect(0,0,canvas.width, canvas.height);
+
+      // Preview background
+      if (state.darkPreviewBg){
+        ctx.fillStyle = "rgba(0,0,0,.22)";
+        ctx.fillRect(0,0,canvas.width, canvas.height);
+      } else {
+        drawCheckerboard();
+      }
+
+      // Sort layers: background first, then others
+      const sorted = [...state.layers].sort((a,b) => {
+        const ka = a.kind === "background" ? 0 : 1;
+        const kb = b.kind === "background" ? 0 : 1;
+        return ka-kb;
+      });
+
+      for (const layer of sorted){
+        if (!layer.visible) continue;
+        if (!layer.image) continue;
+
+        const img = layer.image;
+        const iw = img.naturalWidth || img.width;
+        const ih = img.naturalHeight || img.height;
+
+        const scale = layer.scale ?? 1;
+        const opacity = layer.opacity ?? 1;
+
+        const drawW = iw * scale;
+        const drawH = ih * scale;
+
+        const x = (layer.x ?? 0);
+        const y = (layer.y ?? 0);
+
+        ctx.save();
+        ctx.globalAlpha = opacity;
+
+        if (layer.useChroma){
+          const keyHex = layer.keyColor || state.keyColor;
+          const th = layer.chromaThreshold ?? state.keyThreshold;
+          const keyed = applyChromaToImage(img, keyHex, th);
+          ctx.drawImage(keyed, x, y, drawW, drawH);
+        } else {
+          ctx.drawImage(img, x, y, drawW, drawH);
+        }
+
+        ctx.restore();
+      }
+
+      if (state.showGrid) drawGrid();
+    }
+
+    function fitCanvasView(){
+      // Just a UX helper: scale layers to fit background within canvas if needed.
+      const bg = state.layers.find(l => l.kind === "background" && l.image);
+      if (!bg) return;
+
+      const img = bg.image;
+      const iw = img.naturalWidth || img.width;
+      const ih = img.naturalHeight || img.height;
+      const sx = canvas.width / iw;
+      const sy = canvas.height / ih;
+      const s = Math.max(sx, sy); // cover
+      bg.scale = s;
+      bg.x = (canvas.width - iw*s)/2;
+      bg.y = (canvas.height - ih*s)/2;
+      recompose();
+      renderLayers();
+    }
+
+    // Export PNG from canvas
+    function exportPNG(){
+      const url = canvas.toDataURL("image/png");
+      downloadDataUrl(url, `scene_${Date.now()}.png`);
+    }
+
+    // Fullscreen modal
+    const modal = $("modal");
+    const modalImg = $("modalImg");
+    const modalMeta = $("modalMeta");
+    let modalDataUrl = null;
+
+    function openModalFromCanvas(){
+      modalDataUrl = canvas.toDataURL("image/png");
+      modalImg.src = modalDataUrl;
+      modalMeta.textContent = `${state.canvasW}×${state.canvasH}`;
+      modal.classList.add("show");
+    }
+    function closeModal(){ modal.classList.remove("show"); }
+    $("btnModalClose").addEventListener("click", closeModal);
+    modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
+    $("btnModalDownload").addEventListener("click", () => {
+      if (!modalDataUrl) return;
+      downloadDataUrl(modalDataUrl, `scene_${Date.now()}.png`);
+    });
+
+    // Busy overlay
+    const busy = $("busy");
+    const busyTitle = $("busyTitle");
+    const busyText = $("busyText");
+    function setBusy(on, title="Генерация…", text=""){
+      if (on){
+        busyTitle.textContent = title;
+        busyText.textContent = text || "Работаем. Если сервер/модель не поддерживает запрос, ты увидишь понятную ошибку.";
+        busy.classList.add("show");
+      } else {
+        busy.classList.remove("show");
+      }
+    }
+
+    // -------------------------
+    // Layer UI
+    // -------------------------
+    const layerList = $("layerList");
+    const noLayersHint = $("noLayersHint");
+
+    function updateBadges(){
+      $("badgeKey").textContent = state.keyColor.toUpperCase();
+      $("badgeLayers").textContent = state.layers.length;
+      noLayersHint.style.display = state.layers.length ? "none" : "block";
+    }
+
+    function renderLayers(){
+      updateBadges();
+      layerList.innerHTML = "";
+
+      for (const layer of state.layers){
+        const card = document.createElement("div");
+        card.className = "layercard";
+
+        const lh = document.createElement("div");
+        lh.className = "lh";
+
+        const nm = document.createElement("div");
+        nm.className = "name";
+        const title = document.createElement("strong");
+        title.textContent = layer.name || "(без названия)";
+        const sub = document.createElement("span");
+        sub.textContent = `${layer.kind} • ${layer.useChroma ? "хромакей" : "без хромакея"} • opacity ${(layer.opacity??1).toFixed(2)}`;
+        nm.appendChild(title);
+        nm.appendChild(sub);
+
+        const right = document.createElement("div");
+        right.style.display = "flex";
+        right.style.gap = "8px";
+        right.style.alignItems = "center";
+
+        const visBtn = document.createElement("button");
+        visBtn.className = "btn small";
+        visBtn.textContent = layer.visible ? "👁" : "🚫";
+        visBtn.title = "Показать/скрыть";
+        visBtn.addEventListener("click", () => {
+          layer.visible = !layer.visible;
+          recompose(); renderLayers();
+        });
+
+        const upBtn = document.createElement("button");
+        upBtn.className = "btn small";
+        upBtn.textContent = "↑";
+        upBtn.title = "Выше";
+        upBtn.addEventListener("click", () => {
+          const i = state.layers.findIndex(l => l.id === layer.id);
+          if (i > 0){
+            const tmp = state.layers[i-1];
+            state.layers[i-1] = state.layers[i];
+            state.layers[i] = tmp;
+            recompose(); renderLayers();
+          }
+        });
+
+        const dnBtn = document.createElement("button");
+        dnBtn.className = "btn small";
+        dnBtn.textContent = "↓";
+        dnBtn.title = "Ниже";
+        dnBtn.addEventListener("click", () => {
+          const i = state.layers.findIndex(l => l.id === layer.id);
+          if (i < state.layers.length - 1){
+            const tmp = state.layers[i+1];
+            state.layers[i+1] = state.layers[i];
+            state.layers[i] = tmp;
+            recompose(); renderLayers();
+          }
+        });
+
+        right.appendChild(visBtn);
+        right.appendChild(upBtn);
+        right.appendChild(dnBtn);
+
+        lh.appendChild(nm);
+        lh.appendChild(right);
+
+        const lb = document.createElement("div");
+        lb.className = "lb";
+
+        // Prompt editor
+        const promptField = document.createElement("div");
+        promptField.className = "field";
+        promptField.style.marginBottom = "0";
+
+        const lr = document.createElement("div");
+        lr.className = "labelrow";
+        const l = document.createElement("div");
+        l.className = "label";
+        l.textContent = "Промпт слоя";
+        const h = document.createElement("div");
+        h.className = "hint";
+        h.innerHTML = `<span class="muted2">${layer.kind === "background" ? "фон" : "объект"}</span>`;
+        lr.appendChild(l); lr.appendChild(h);
+
+        const ta = document.createElement("textarea");
+        ta.value = layer.prompt || "";
+        ta.placeholder = layer.kind === "background"
+          ? "Опиши фон: локация, освещение, стиль, без объектов на переднем плане."
+          : "Опиши объект: один объект, центр, зелёный фон, без текста, без водяных знаков.";
+        ta.addEventListener("input", () => { layer.prompt = ta.value; });
+
+        promptField.appendChild(lr);
+        promptField.appendChild(ta);
+
+        // Controls
+        const controls = document.createElement("div");
+        controls.className = "controls";
+
+        controls.appendChild(makeRangeCtrl("Scale", layer.scale ?? 1, 0.1, 4, 0.01, (v)=>{
+          layer.scale = v; recompose(); renderLayers();
+        }));
+
+        controls.appendChild(makeRangeCtrl("Opacity", layer.opacity ?? 1, 0, 1, 0.01, (v)=>{
+          layer.opacity = v; recompose(); renderLayers();
+        }));
+
+        controls.appendChild(makeRangeCtrl("X", layer.x ?? 0, -canvas.width, canvas.width, 1, (v)=>{
+          layer.x = v; recompose();
+        }, true));
+
+        controls.appendChild(makeRangeCtrl("Y", layer.y ?? 0, -canvas.height, canvas.height, 1, (v)=>{
+          layer.y = v; recompose();
+        }, true));
+
+        // Chroma controls
+        const chromaCtrl = document.createElement("div");
+        chromaCtrl.className = "ctrl";
+        const krow = document.createElement("div");
+        krow.className = "k";
+        krow.innerHTML = `<span>Chroma key</span><b>${(layer.keyColor || state.keyColor).toUpperCase()}</b>`;
+        const chromaRow = document.createElement("div");
+        chromaRow.style.display = "flex";
+        chromaRow.style.gap = "8px";
+        chromaRow.style.alignItems = "center";
+
+        const chromaToggle = document.createElement("button");
+        chromaToggle.className = "btn small";
+        chromaToggle.textContent = layer.useChroma ? "ON" : "OFF";
+        chromaToggle.style.minWidth = "64px";
+        chromaToggle.addEventListener("click", () => {
+          layer.useChroma = !layer.useChroma;
+          chromaToggle.textContent = layer.useChroma ? "ON" : "OFF";
+          recompose(); renderLayers();
+        });
+
+        const keyInput = document.createElement("input");
+        keyInput.type = "text";
+        keyInput.value = (layer.keyColor || state.keyColor).replace("#","");
+        keyInput.maxLength = 6;
+        keyInput.placeholder = "00FF00";
+        keyInput.style.fontFamily = "var(--mono)";
+        keyInput.addEventListener("change", () => {
+          const v = keyInput.value.trim().replace("#","");
+          if (!/^[0-9a-fA-F]{6}$/.test(v)){
+            showToast("Неверный цвет. Нужен hex типа 00FF00.");
+            keyInput.value = (layer.keyColor || state.keyColor).replace("#","");
+            return;
+          }
+          layer.keyColor = "#" + v.toUpperCase();
+          recompose(); renderLayers();
+        });
+
+        chromaRow.appendChild(chromaToggle);
+        chromaRow.appendChild(keyInput);
+        chromaCtrl.appendChild(krow);
+        chromaCtrl.appendChild(chromaRow);
+
+        const thCtrl = makeRangeCtrl("Chroma threshold", layer.chromaThreshold ?? state.keyThreshold, 0, 200, 1, (v)=>{
+          layer.chromaThreshold = v;
+          recompose(); renderLayers();
+        });
+        // only show if chroma enabled
+        thCtrl.style.opacity = layer.useChroma ? "1" : ".55";
+
+        // Actions
+        const acts = document.createElement("div");
+        acts.className = "layer-actions";
+
+        const genBtn = document.createElement("button");
+        genBtn.className = "btn small primary";
+        genBtn.textContent = "🎨 Сгенерировать";
+        genBtn.addEventListener("click", async () => {
+          await generateLayer(layer);
+        });
+
+        const improveBtn = document.createElement("button");
+        improveBtn.className = "btn small";
+        improveBtn.textContent = "🧠 Улучшить";
+        improveBtn.addEventListener("click", async () => {
+          await improvePromptForLayer(layer);
+          ta.value = layer.prompt || "";
+        });
+
+        const clearBtn = document.createElement("button");
+        clearBtn.className = "btn small";
+        clearBtn.textContent = "🧼 Очистить img";
+        clearBtn.addEventListener("click", () => {
+          layer.image = null;
+          layer.imageUrl = null;
+          recompose();
+          renderLayers();
+        });
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn small bad";
+        delBtn.textContent = "🗑 Удалить";
+        delBtn.addEventListener("click", () => {
+          state.layers = state.layers.filter(l => l.id !== layer.id);
+          recompose(); renderLayers();
+        });
+
+        acts.appendChild(improveBtn);
+        acts.appendChild(genBtn);
+        acts.appendChild(clearBtn);
+        acts.appendChild(delBtn);
+
+        // Thumbnail
+        if (layer.imageUrl){
+          const img = document.createElement("img");
+          img.src = layer.imageUrl;
+          img.alt = layer.name || "layer";
+          img.style.width = "100%";
+          img.style.borderRadius = "12px";
+          img.style.border = "1px solid rgba(255,255,255,.10)";
+          img.style.background = "rgba(0,0,0,.25)";
+          img.style.cursor = "pointer";
+          img.addEventListener("click", () => {
+            modalDataUrl = layer.imageUrl;
+            modalImg.src = layer.imageUrl;
+            modalMeta.textContent = layer.name || layer.kind;
+            modal.classList.add("show");
+          });
+          lb.appendChild(img);
+        }
+
+        lb.appendChild(promptField);
+        lb.appendChild(controls);
+        lb.appendChild(chromaCtrl);
+        lb.appendChild(thCtrl);
+        lb.appendChild(acts);
+
+        card.appendChild(lh);
+        card.appendChild(lb);
+
+        layerList.appendChild(card);
+      }
+    }
+
+    function makeRangeCtrl(label, value, min, max, step, onChange, showInt=false){
+      const c = document.createElement("div");
+      c.className = "ctrl";
+      const k = document.createElement("div");
+      k.className = "k";
+      const vtxt = showInt ? String(Math.round(value)) : (Number(value).toFixed(2));
+      k.innerHTML = `<span>${label}</span><b>${vtxt}</b>`;
+      const r = document.createElement("input");
+      r.type = "range";
+      r.min = min; r.max = max; r.step = step; r.value = value;
+      r.addEventListener("input", () => {
+        const v = parseFloat(r.value);
+        k.querySelector("b").textContent = showInt ? String(Math.round(v)) : v.toFixed(2);
+        onChange(v);
+      });
+      c.appendChild(k);
+      c.appendChild(r);
+      return c;
+    }
+
+    // -------------------------
+    // Prompt logic (split & improve)
+    // -------------------------
+    function applyStylePreset(text){
+      const base = (text || "").trim();
+      if (!base) return base;
+
+      const style = state.activeStyle;
+      const add = {
+        clean: "Style: clean, high-quality, coherent lighting, no text, no watermark.",
+        cinematic: "Style: cinematic, dramatic lighting, film look, depth of field, no text, no watermark.",
+        illustration: "Style: illustration, soft shading, crisp edges, coherent lighting, no text, no watermark.",
+        pixel: "Style: pixel art, limited palette, crisp pixels, no text, no watermark."
+      }[style] || "";
+
+      // If already has Style:, don't duplicate aggressively
+      if (/style\s*:/i.test(base)) return base;
+      return add ? `${base}\n\n${add}` : base;
+    }
+
+    function splitScenePrompt(scenePrompt){
+      // Heuristic split into background and subject based on simple cues.
+      // If user writes "фон:" and "объект:" we'll respect it.
+      const s = (scenePrompt || "").trim();
+      if (!s) return { bg:"", subj:"" };
+
+      const mBg = s.match(/фон\s*:\s*([\s\S]*?)(?:\n{2,}|объект\s*:|предмет\s*:|герой\s*:|$)/i);
+      const mSub = s.match(/(?:объект|предмет|герой)\s*:\s*([\s\S]*)$/i);
+
+      if (mBg || mSub){
+        const bg = (mBg ? mBg[1] : "").trim();
+        const subj = (mSub ? mSub[1] : "").trim();
+        return { bg, subj };
+      }
+
+      // Otherwise: assume last noun phrase might be subject? Too risky.
+      // We'll generate both from same base prompt but impose constraints.
+      return { bg: s, subj: s };
+    }
+
+    function buildBackgroundPrompt(base){
+      const p = applyStylePreset(base);
+      return `${p}
+
+STRICT RULES:
+- Background-only plate, no main subject in foreground.
+- High quality, coherent lighting.
+- No text, no watermark.`;
+    }
+
+    function buildSubjectPrompt(base){
+      const p = applyStylePreset(base);
+      const key = state.keyColor.toUpperCase();
+      const hex = key.replace("#","");
+      return `${p}
+
+STRICT RULES:
+- ONE main subject only.
+- Centered, fully visible (not cropped).
+- Background must be a perfectly solid flat color: #${hex} (no gradient, no shadows on background).
+- No additional objects, no scenery, no text, no watermark.
+- Clean edges.`;
+    }
+
+    async function improvePrompt(prompt, kind){
+      // Uses /generate_text as a prompt improver (server decides model).
+      // We pass a meta instruction inside the prompt, because the server may be dumb.
+      const instruction = kind === "background"
+        ? "Improve this prompt for generating a BACKGROUND-ONLY plate. Keep it concise, specific, and enforce constraints: no foreground subject, coherent lighting, no text/watermark. Output only the improved prompt."
+        : "Improve this prompt for generating a SINGLE SUBJECT on a solid chroma-key background. Enforce: one subject, centered, fully visible, solid #00FF00 background, no scenery, no text/watermark. Output only the improved prompt.";
+
+      const payload = {
+        prompt: `${instruction}\n\nPROMPT:\n${prompt}`
+      };
+      const res = await postJSON("/generate_text", payload);
+      if (res.error) throw new Error(res.error);
+      return (res.text || "").trim();
+    }
+
+    // -------------------------
+    // Generation
+    // -------------------------
+    async function generateLayer(layer){
+      const base = (layer.prompt || "").trim();
+      if (!base){
+        showToast("Промпт пустой. Даже ИИ не умеет читать мысли, извини.");
+        return;
+      }
+
+      const finalPrompt = layer.kind === "background" ? buildBackgroundPrompt(base)
+                        : layer.kind === "subject" ? buildSubjectPrompt(base)
+                        : applyStylePreset(base);
+
+      const req = {
+        prompt: finalPrompt,
+        layer_kind: layer.kind,
+        layer_name: layer.name || layer.kind,
+        key_color: (layer.keyColor || state.keyColor).replace("#","")
+      };
+
+      try{
+        setBusy(true, `Генерация слоя: ${layer.name || layer.kind}`, "Если прилетит 404, значит модель/endpoint не поддерживает image generation.");
+        log(`POST /generate_layer (${layer.kind})`, "info");
+        const res = await postJSON("/generate_layer", req);
+        if (res.error) throw new Error(res.error);
+
+        const b64 = res.image_base64;
+        if (!b64) throw new Error("Сервер не вернул image_base64.");
+
+        const mime = res.mime_type || "image/png";
+        const url = dataUrlFromBase64(b64, mime);
+
+        const img = new Image();
+        img.onload = () => {
+          layer.image = img;
+          layer.imageUrl = url;
+          layer.mime = mime;
+
+          // Default placement
+          if (layer.kind === "background"){
+            // cover
+            layer.useChroma = false;
+            layer.visible = true;
+            layer.opacity = 1;
+            layer.scale = 1;
+            layer.x = 0;
+            layer.y = 0;
+
+            // Fit to canvas as cover
+            const iw = img.naturalWidth || img.width;
+            const ih = img.naturalHeight || img.height;
+            const sx = canvas.width / iw;
+            const sy = canvas.height / ih;
+            const s = Math.max(sx, sy);
+            layer.scale = s;
+            layer.x = (canvas.width - iw*s)/2;
+            layer.y = (canvas.height - ih*s)/2;
+          } else {
+            // subject defaults
+            layer.useChroma = true;
+            layer.visible = true;
+            layer.opacity = 1;
+
+            const iw = img.naturalWidth || img.width;
+            const ih = img.naturalHeight || img.height;
+            const sx = (canvas.width * 0.6) / iw;
+            const sy = (canvas.height * 0.6) / ih;
+            const s = Math.min(sx, sy);
+            layer.scale = clamp(s, 0.1, 4);
+            layer.x = (canvas.width - (iw*layer.scale))/2;
+            layer.y = (canvas.height - (ih*layer.scale))/2;
+
+            layer.keyColor = "#" + (req.key_color || "00FF00").toUpperCase();
+            layer.chromaThreshold = layer.chromaThreshold ?? state.keyThreshold;
+          }
+
+          recompose();
+          renderLayers();
+          showToast(`Слой готов: ${layer.name || layer.kind}`);
+          setBusy(false);
+        };
+        img.onerror = () => {
+          setBusy(false);
+          throw new Error("Не удалось загрузить изображение (base64->img).");
+        };
+        img.src = url;
+
+      } catch(e){
+        setBusy(false);
+        log(String(e.message || e), "error");
+        showToast(`Ошибка генерации слоя: ${e.message || e}`);
+      }
+    }
+
+    async function improvePromptForLayer(layer){
+      const base = (layer.prompt || "").trim();
+      if (!base){
+        showToast("Улучшать нечего. Пустота улучшению не подлежит.");
+        return;
+      }
+      try{
+        setBusy(true, "Улучшение промпта…", "Сейчас сервер перепишет промпт так, чтобы он был понятнее модели.");
+        const improved = await improvePrompt(base, layer.kind === "background" ? "background" : "subject");
+        layer.prompt = improved;
+        setBusy(false);
+        showToast("Промпт улучшен.");
+        renderLayers();
+      } catch(e){
+        setBusy(false);
+        log(String(e.message || e), "error");
+        showToast(`Ошибка улучшения: ${e.message || e}`);
+      }
+    }
+
+    async function generateScene(){
+      const scene = ($("scenePrompt").value || "").trim();
+      if (!scene){
+        showToast("Сцена пустая. Напиши что-нибудь, кроме молчаливого отчаяния.");
+        return;
+      }
+
+      const { bg, subj } = splitScenePrompt(scene);
+
+      // Ensure layers exist (background + subject)
+      let bgLayer = state.layers.find(l => l.kind === "background");
+      let subLayer = state.layers.find(l => l.kind === "subject");
+
+      if (!bgLayer){
+        bgLayer = makeLayer("background", "Background • Фон");
+        state.layers.unshift(bgLayer);
+      }
+      if (!subLayer){
+        subLayer = makeLayer("subject", "Subject • Объект");
+        state.layers.push(subLayer);
+      }
+
+      bgLayer.prompt = bg || scene;
+      subLayer.prompt = subj || scene;
+
+      renderLayers();
+      recompose();
+
+      // Generate sequentially
+      await generateLayer(bgLayer);
+      await generateLayer(subLayer);
+    }
+
+    async function improveScenePrompt(){
+      const scene = ($("scenePrompt").value || "").trim();
+      if (!scene){ showToast("Пустой промпт сцены улучшить нельзя."); return; }
+
+      try{
+        setBusy(true, "Улучшение промпта сцены…", "Делаем промпт конкретнее, без воды, с нормальными ограничениями.");
+        const payload = {
+          prompt:
+`You are a prompt optimizer. Improve the user's scene prompt for image generation.
+Rules:
+- Make it specific, concrete, visual.
+- Keep it short but unambiguous.
+- Add lighting, camera, style hints if missing.
+- Remove contradictions, avoid verbose fluff.
+- No mention of APIs.
+Output only the improved prompt in Russian.
+
+USER PROMPT:
+${scene}`
+        };
+        const res = await postJSON("/generate_text", payload);
+        if (res.error) throw new Error(res.error);
+        const improved = (res.text || "").trim();
+        if (improved) $("scenePrompt").value = improved;
+        setBusy(false);
+        showToast("Промпт сцены улучшен.");
+        updateStats();
+      } catch(e){
+        setBusy(false);
+        log(String(e.message || e), "error");
+        showToast(`Ошибка улучшения сцены: ${e.message || e}`);
+      }
+    }
+
+    function makeLayer(kind="custom", name="Новый слой"){
+      return {
+        id: uid(),
+        kind,
+        name,
+        prompt: "",
+        image: null,
+        imageUrl: null,
+        mime: "image/png",
+        keyColor: state.keyColor,
+        chromaThreshold: state.keyThreshold,
+        x: 0,
+        y: 0,
+        scale: 1,
+        opacity: 1,
+        visible: true,
+        useChroma: kind === "subject"
+      };
+    }
+
+    // -------------------------
+    // History
+    // -------------------------
+    const historyEl = $("history");
+    const noHistoryHint = $("noHistoryHint");
+
+    function addSnapshot(){
+      const url = canvas.toDataURL("image/png");
+      const scene = ($("scenePrompt").value || "").trim();
+      state.history.unshift({
+        id: uid(),
+        url,
+        prompt: scene,
+        ts: Date.now(),
+        size: `${state.canvasW}×${state.canvasH}`
+      });
+      if (state.history.length > 20) state.history.pop();
+      renderHistory();
+      showToast("Снимок добавлен.");
+    }
+
+    function renderHistory(){
+      historyEl.innerHTML = "";
+      noHistoryHint.style.display = state.history.length ? "none" : "block";
+
+      for (const it of state.history){
+        const row = document.createElement("div");
+        row.className = "histitem";
+
+        const img = document.createElement("img");
+        img.className = "thumb";
+        img.src = it.url;
+        img.alt = "snapshot";
+        img.addEventListener("click", () => {
+          modalDataUrl = it.url;
+          modalImg.src = it.url;
+          modalMeta.textContent = `${it.size}`;
+          modal.classList.add("show");
+        });
+
+        const meta = document.createElement("div");
+        meta.className = "histmeta";
+
+        const p = document.createElement("div");
+        p.className = "p";
+        p.textContent = it.prompt || "(без промпта)";
+
+        const s = document.createElement("div");
+        s.className = "s";
+        s.innerHTML = `<span>${new Date(it.ts).toLocaleString()}</span> <code>${it.size}</code>`;
+
+        const acts = document.createElement("div");
+        acts.style.display = "flex";
+        acts.style.gap = "8px";
+        acts.style.flexWrap = "wrap";
+        acts.style.marginTop = "6px";
+
+        const openBtn = document.createElement("button");
+        openBtn.className = "btn small";
+        openBtn.textContent = "Открыть";
+        openBtn.addEventListener("click", () => {
+          modalDataUrl = it.url;
+          modalImg.src = it.url;
+          modalMeta.textContent = `${it.size}`;
+          modal.classList.add("show");
+        });
+
+        const dlBtn = document.createElement("button");
+        dlBtn.className = "btn small";
+        dlBtn.textContent = "PNG";
+        dlBtn.addEventListener("click", () => downloadDataUrl(it.url, `snapshot_${it.ts}.png`));
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn small bad";
+        delBtn.textContent = "Удалить";
+        delBtn.addEventListener("click", () => {
+          state.history = state.history.filter(x => x.id !== it.id);
+          renderHistory();
+        });
+
+        acts.appendChild(openBtn);
+        acts.appendChild(dlBtn);
+        acts.appendChild(delBtn);
+
+        meta.appendChild(p);
+        meta.appendChild(s);
+        meta.appendChild(acts);
+
+        row.appendChild(img);
+        row.appendChild(meta);
+        historyEl.appendChild(row);
+      }
+    }
+
+    // -------------------------
+    // Stats (price)
+    // -------------------------
+    function updateStats(){
+      const scene = ($("scenePrompt").value || "");
+      const { chars, words, tokens } = estimateStats(scene);
+      $("statChars").textContent = chars;
+      $("statWords").textContent = words;
+      $("statTokens").textContent = tokens;
+
+      const pricePerM = parseFloat($("pricePerMTokens").value || "0") || 0;
+      const usdToIls = parseFloat($("usdToIls").value || "0") || 0;
+      const usd = (tokens / 1_000_000) * pricePerM;
+      const ils = usd * usdToIls;
+
+      $("statUSD").textContent = `$${usd.toFixed(4)}`;
+      $("statILS").textContent = `₪${ils.toFixed(4)}`;
+    }
+
+    // -------------------------
+    // UI events
+    // -------------------------
+    $("btnPing").addEventListener("click", async ()=> {
+      const ok = await ping();
+      showToast(ok ? "Сервер онлайн." : "Сервер не отвечает.");
+    });
+
+    $("btnHelp").addEventListener("click", () => {
+      showToast(
+`Подсказки:
+• "Разбить сцену" создаёт фон и объект.
+• Объект генерится на зелёном фоне #00FF00 и вырезается (threshold регулируется).
+• Если 404 на генерации, значит модель/endpoint не поддерживают изображения.
+• "Экспорт PNG" скачивает текущую сборку canvas.`
+      );
+    });
+
+    $("btnReset").addEventListener("click", () => {
+      state.layers = [];
+      state.history = [];
+      logBox.value = "";
+      $("scenePrompt").value = "";
+      renderLayers();
+      renderHistory();
+      recompose();
+      updateStats();
+      showToast("Сброшено.");
+    });
+
+    $("btnExport").addEventListener("click", exportPNG);
+    $("btnFullscreen").addEventListener("click", openModalFromCanvas);
+    $("btnSnap").addEventListener("click", addSnapshot);
+    $("btnClearHistory").addEventListener("click", () => {
+      state.history = [];
+      renderHistory();
+      showToast("История очищена.");
+    });
+
+    $("btnRecompose").addEventListener("click", () => { recompose(); showToast("Пересобрано."); });
+    $("btnFit").addEventListener("click", () => { fitCanvasView(); showToast("Подогнали фон."); });
+
+    $("btnZoomIn").addEventListener("click", () => { state.zoom = clamp(state.zoom + 0.1, 0.5, 2); canvas.style.transform = `scale(${state.zoom})`; });
+    $("btnZoomOut").addEventListener("click", () => { state.zoom = clamp(state.zoom - 0.1, 0.5, 2); canvas.style.transform = `scale(${state.zoom})`; });
+
+    $("btnToggleGrid").addEventListener("click", () => { state.showGrid = !state.showGrid; recompose(); });
+    $("btnToggleBg").addEventListener("click", () => { state.darkPreviewBg = !state.darkPreviewBg; recompose(); });
+
+    $("btnAddLayer").addEventListener("click", () => {
+      const l = makeLayer("custom", `Custom • Слой ${state.layers.length+1}`);
+      l.prompt = applyStylePreset(($("scenePrompt").value || "").trim());
+      state.layers.push(l);
+      renderLayers();
+      recompose();
+    });
+
+    $("btnGenLayer").addEventListener("click", async () => {
+      // generate currently last custom layer, or create one
+      let l = [...state.layers].reverse().find(x => x.kind === "custom");
+      if (!l){
+        l = makeLayer("custom", `Custom • Слой ${state.layers.length+1}`);
+        l.prompt = applyStylePreset(($("scenePrompt").value || "").trim());
+        state.layers.push(l);
+      }
+      renderLayers();
+      await generateLayer(l);
+    });
+
+    $("btnGenerateScene").addEventListener("click", generateScene);
+    $("btnImproveScene").addEventListener("click", improveScenePrompt);
+
+    $("scenePrompt").addEventListener("input", updateStats);
+    $("pricePerMTokens").addEventListener("input", updateStats);
+    $("usdToIls").addEventListener("input", updateStats);
+
+    // Style presets
+    $("stylePresets").addEventListener("click", (e) => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      [...$("stylePresets").querySelectorAll(".chip")].forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+      state.activeStyle = chip.getAttribute("data-style") || "clean";
+      showToast(`Стиль: ${chip.textContent.trim()}`);
+    });
+
+    // Drag to move subject layer quickly (touch-friendly)
+    let drag = null;
+    canvas.addEventListener("pointerdown", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const cx = (e.clientX - rect.left) * (canvas.width / rect.width);
+      const cy = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+      // pick topmost visible non-background
+      const candidates = [...state.layers].filter(l => l.visible && l.image && l.kind !== "background");
+      if (!candidates.length) return;
+      const picked = candidates[candidates.length - 1];
+
+      drag = { layer: picked, startX: cx, startY: cy, ox: picked.x || 0, oy: picked.y || 0 };
+      canvas.setPointerCapture(e.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      const rect = canvas.getBoundingClientRect();
+      const cx = (e.clientX - rect.left) * (canvas.width / rect.width);
+      const cy = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+      const dx = cx - drag.startX;
+      const dy = cy - drag.startY;
+
+      drag.layer.x = (drag.ox + dx);
+      drag.layer.y = (drag.oy + dy);
+
+      recompose();
+    });
+
+    canvas.addEventListener("pointerup", (e) => {
+      if (!drag) return;
+      drag = null;
+      renderLayers();
+    });
+
+    // Init
+    function init(){
+      resizeCanvas(1024, 1024);
+      updateStats();
+      renderLayers();
+      renderHistory();
+      ping();
+      showToast("Готово. Теперь бы ещё модель для картинок, и будет праздник.");
+    }
+    init();
+
+  })();
+  </script>
+</body>
+  </html>      <div style="height:12px"></div>
       <div id="textOut" class="out"></div>
     </div>
 
