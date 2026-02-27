@@ -548,6 +548,672 @@ function hexToRgb(hex){
   return {r:(n>>16)&255, g:(n>>8)&255, b:n&255};
 }
 
+function chromaKeyImageData(imgData, keyHex, threshold){
+  const key = hexToRgb(keyHex);
+  const d = imgData.data;
+  const thr = threshold ?? 55;
+
+  for(let i=0;i<d.length;i+=4){
+    const r = d[i], g = d[i+1], b = d[i+2];
+    // simple distance in RGB
+    const dist = Math.abs(r-key.r) + Math.abs(g-key.g) + Math.abs(b-key.b);
+    if(dist < thr){
+      d[i+3] = 0;
+    }
+  }
+  return imgData;
+}
+
+function loadImage(src){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+async function renderComposite(){
+  // Find first available image to decide canvas size
+  const bg = layers.find(l => l.kind === "background" && l.imageDataUrl);
+  if(bg){
+    try{
+      const bgImg = await loadImage(bg.imageDataUrl);
+      canvas.width = bgImg.naturalWidth || 1024;
+      canvas.height = bgImg.naturalHeight || 768;
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.globalAlpha = 1;
+      ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+    }catch(e){
+      clearCanvas();
+    }
+  }else{
+    clearCanvas();
+  }
+
+  // Draw objects in order (excluding background)
+  for(const layer of layers){
+    if(layer.kind === "background") continue;
+    if(!layer.imageDataUrl) continue;
+
+    const img = await loadImage(layer.imageDataUrl);
+
+    // temp canvas for chromakey
+    const tmp = document.createElement("canvas");
+    tmp.width = img.naturalWidth || 1024;
+    tmp.height = img.naturalHeight || 768;
+    const tctx = tmp.getContext("2d");
+    tctx.drawImage(img, 0, 0);
+
+    // apply chromakey
+    const imageData = tctx.getImageData(0,0,tmp.width,tmp.height);
+    chromaKeyImageData(imageData, (layer.keyColor || KEY_COLOR).toUpperCase(), layer.chromaThreshold ?? 55);
+    tctx.putImageData(imageData, 0, 0);
+
+    // composite draw
+    const scale = layer.scale ?? 1.0;
+    const opacity = layer.opacity ?? 1.0;
+    const x = (canvas.width/2) - (tmp.width*scale/2) + (layer.x ?? 0);
+    const y = (canvas.height/2) - (tmp.height*scale/2) + (layer.y ?? 0);
+
+    ctx.globalAlpha = opacity;
+    ctx.drawImage(tmp, x, y, tmp.width*scale, tmp.height*scale);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function addToHistory(summaryPrompt){
+  const dataUrl = canvas.toDataURL("image/png");
+  historyItems.unshift({id: Date.now(), prompt: summaryPrompt, dataUrl});
+  historyItems = historyItems.slice(0, 8);
+  renderHistory();
+}
+
+function renderHistory(){
+  const box = document.getElementById("history");
+  if(historyItems.length === 0){ box.innerHTML = ""; return; }
+
+  box.innerHTML = historyItems.map((h, idx) => `
+    <div class="histItem">
+      <div>
+        <a href="#" onclick="loadHistory(${idx}); return false;">Снимок #${historyItems.length - idx}</a>
+        <div><span>${escapeHtml(h.prompt.slice(0, 90))}${h.prompt.length>90?'…':''}</span></div>
+      </div>
+      <button class="secondary" onclick="downloadHistory(${idx})">Скачать</button>
+    </div>
+  `).join("");
+}
+
+function loadHistory(idx){
+  const h = historyItems[idx];
+  const img = new Image();
+  img.onload = () => {
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,0,0);
+  };
+  img.src = h.dataUrl;
+  document.getElementById("promptUsed").textContent = "Снимок: " + h.prompt;
+}
+
+function downloadHistory(idx){
+  const h = historyItems[idx];
+  const a = document.createElement("a");
+  a.href = h.dataUrl;
+  a.download = `ai-scene-snapshot-${h.id}.png`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function downloadComposite(){
+  const a = document.createElement("a");
+  a.href = canvas.toDataURL("image/png");
+  a.download = `ai-scene-${Date.now()}.png`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function exportSceneJSON(){
+  const payload = {
+    keyColor: KEY_COLOR,
+    canvas: {width: canvas.width, height: canvas.height},
+    layers: layers.map(l => ({
+      name: l.name, role: l.role, kind: l.kind, prompt: l.prompt,
+      x: l.x, y: l.y, scale: l.scale, opacity: l.opacity,
+      chromaThreshold: l.chromaThreshold,
+      hasImage: !!l.imageDataUrl
+    }))
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ai-scene-${Date.now()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+</script>
+</body>
+</html>  .grid{
+    max-width: 1200px; margin: 16px auto; padding: 0 16px 22px;
+    display:grid; grid-template-columns: 380px 1fr; gap: 14px;
+  }
+  .card{
+    background: linear-gradient(180deg, rgba(18,26,39,.95), rgba(15,22,34,.95));
+    border: 1px solid rgba(33,48,73,.9);
+    border-radius: var(--r);
+    box-shadow: var(--shadow);
+    overflow:hidden;
+  }
+  .card h2{
+    margin:0; padding: 14px 14px 10px;
+    font-size: 14px; text-transform: uppercase; letter-spacing: .12em;
+    color: var(--muted);
+    border-bottom: 1px solid rgba(33,48,73,.8);
+    background: rgba(15,22,34,.55);
+  }
+  .pad{padding: 14px;}
+  textarea{
+    width:100%;
+    min-height: 120px;
+    resize: vertical;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(33,48,73,.9);
+    outline: none;
+    background: rgba(7,10,16,.65);
+    color: var(--text);
+    line-height: 1.35;
+  }
+  textarea:focus{ border-color: rgba(76,141,255,.9); box-shadow: 0 0 0 3px rgba(76,141,255,.15); }
+  .row{display:flex; gap:10px; flex-wrap: wrap;}
+  button{
+    appearance: none;
+    border: 1px solid rgba(76,141,255,.55);
+    background: linear-gradient(180deg, rgba(76,141,255,1), rgba(47,106,230,1));
+    color: white;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(76,141,255,.18);
+  }
+  button.secondary{
+    background: rgba(7,10,16,.55);
+    border-color: rgba(33,48,73,.9);
+    box-shadow: none;
+    color: var(--text);
+  }
+  button.danger{
+    background: rgba(255,76,106,.12);
+    border-color: rgba(255,76,106,.45);
+    color: #ffd2da;
+    box-shadow:none;
+  }
+  button:disabled{opacity:.55; cursor:not-allowed;}
+  .hint{color: var(--muted); font-size: 12px; margin-top:8px; line-height:1.35;}
+  .pill{
+    font-size: 12px;
+    color: var(--muted);
+    border: 1px solid rgba(33,48,73,.9);
+    background: rgba(7,10,16,.55);
+    padding: 8px 10px;
+    border-radius: 999px;
+  }
+  .kpi{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;}
+  .error{
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,76,106,.45);
+    background: rgba(255,76,106,.10);
+    color: #ffd2da;
+    display:none;
+    white-space: pre-wrap;
+  }
+  .error.show{display:block;}
+  .layers{display:flex; flex-direction:column; gap:10px; margin-top:12px;}
+  .layer{
+    border: 1px solid rgba(33,48,73,.9);
+    background: rgba(7,10,16,.55);
+    border-radius: 14px;
+    padding: 10px;
+  }
+  .layerTop{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .layerName{font-weight: 950; font-size: 13px;}
+  .layer small{color:var(--muted); display:block; margin-top:3px;}
+  .layer textarea{min-height: 80px; margin-top:10px;}
+  .sliders{display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;}
+  .sliderBox{border:1px solid rgba(33,48,73,.7); border-radius:12px; padding:10px; background: rgba(0,0,0,.12);}
+  .sliderBox label{display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:6px;}
+  input[type="range"]{width:100%;}
+  .split{display:grid; grid-template-columns: 1fr 340px; gap: 14px;}
+  .imgBox{
+    width:100%;
+    aspect-ratio: 4/3;
+    border-radius: 14px;
+    border: 1px dashed rgba(33,48,73,.9);
+    background: rgba(7,10,16,.35);
+    overflow:hidden;
+    position: relative;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  canvas{width:100%; height:100%; display:block;}
+  .overlay{
+    position:absolute; inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    gap:10px;
+    background: rgba(0,0,0,.35);
+    font-weight: 900;
+  }
+  .overlay.show{display:flex;}
+  .spinner{
+    width:26px; height:26px;
+    border-radius: 999px;
+    border: 3px solid rgba(155,176,214,.35);
+    border-top-color: rgba(232,238,252,.95);
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .history{display:flex; flex-direction:column; gap:8px; margin-top: 12px;}
+  .histItem{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    border: 1px solid rgba(33,48,73,.9);
+    background: rgba(7,10,16,.55);
+    border-radius: 12px;
+    padding: 10px;
+  }
+  .histItem a{color:var(--text); font-weight: 950; text-decoration:none;}
+  .histItem span{color:var(--muted); font-size:12px;}
+  @media (max-width: 980px){
+    .grid{grid-template-columns: 1fr;}
+    .split{grid-template-columns: 1fr;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div>AI Scene Studio</div>
+        <div class="sub">Псевдо-слои: фон отдельно, объекты отдельно (хромакей) → сборка на canvas</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="grid">
+  <section class="card">
+    <h2>Слои</h2>
+    <div class="pad">
+      <div class="row">
+        <button id="btnDecompose" onclick="decompose()">Разбить сцену</button>
+        <button class="secondary" onclick="resetAll()">Сбросить</button>
+      </div>
+
+      <div class="kpi">
+        <div class="pill" id="pillKey">🔑 ключ: ?</div>
+        <div class="pill" id="pillModels">🤖 модели: ?</div>
+        <div class="pill" id="pillKeyColor">🟩 key: ?</div>
+      </div>
+
+      <div class="hint">
+        Схема: генеришь фон отдельно, потом каждый слой-объект отдельно на зелёном (#00FF00), UI вырезает зелёный и накладывает.
+        Меняешь промпт слоя → регенеришь только этот слой.
+      </div>
+
+      <div class="error" id="errBox"></div>
+      <div class="layers" id="layers"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Мастерская</h2>
+    <div class="pad split">
+      <div>
+        <textarea id="sceneInput" placeholder="Опиши сцену. Потом нажми «Разбить сцену». Пример: Девушка в красном плаще стоит на улице Токио ночью, неон, дождь, cinematic, 35mm."></textarea>
+
+        <div class="row" style="margin-top:10px">
+          <button id="btnGenAll" onclick="generateAll()">Сгенерировать всё</button>
+          <button class="secondary" onclick="improveWholePrompt()">Улучшить текст сцены</button>
+        </div>
+
+        <div class="hint" id="promptUsed"></div>
+
+        <div class="history" id="history"></div>
+      </div>
+
+      <div>
+        <div class="imgBox">
+          <canvas id="canvas"></canvas>
+          <div class="overlay" id="overlay">
+            <div class="spinner"></div>
+            <div>Генерирую…</div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="secondary" onclick="downloadComposite()">Скачать PNG</button>
+          <button class="secondary" onclick="exportSceneJSON()">Экспорт JSON</button>
+        </div>
+        <div class="hint">Сборка делается в браузере. Это “дешёвый трюк”, но для MVP он работает чересчур хорошо.</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+let layers = []; // {name, role, prompt, kind, imageDataUrl, keyColor, x, y, scale, opacity, chromaThreshold}
+let historyItems = [];
+let busy = false;
+let KEY_COLOR = "#00FF00";
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function setError(msg){
+  const box = document.getElementById("errBox");
+  if(!msg){ box.classList.remove("show"); box.textContent=""; return; }
+  box.textContent = msg;
+  box.classList.add("show");
+}
+
+function setBusy(isBusy){
+  busy = isBusy;
+  document.getElementById("btnDecompose").disabled = isBusy;
+  document.getElementById("btnGenAll").disabled = isBusy;
+  document.getElementById("overlay").classList.toggle("show", isBusy);
+}
+
+async function apiPost(url, body){
+  const res = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+  return await res.json();
+}
+
+async function boot(){
+  try{
+    const res = await fetch("/health");
+    const data = await res.json();
+    document.getElementById("pillKey").textContent = data.has_key ? "🔑 ключ: ок" : "🔑 ключ: нет";
+    document.getElementById("pillModels").textContent = `🤖 ${data.text_model} + ${data.image_model}`;
+    KEY_COLOR = (data.key_color || KEY_COLOR).toUpperCase();
+    document.getElementById("pillKeyColor").textContent = `🟩 key: ${KEY_COLOR}`;
+  }catch(e){
+    document.getElementById("pillKey").textContent = "🔑 ключ: ?";
+    document.getElementById("pillModels").textContent = "🤖 модели: ?";
+    document.getElementById("pillKeyColor").textContent = "🟩 key: ?";
+  }
+  resetAll();
+}
+boot();
+
+function resetAll(){
+  layers = [];
+  renderLayers();
+  clearCanvas();
+  setError("");
+  document.getElementById("promptUsed").textContent = "";
+  historyItems = [];
+  renderHistory();
+}
+
+function escapeHtml(s){
+  return String(s)
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+}
+
+function renderLayers(){
+  const container = document.getElementById("layers");
+  container.innerHTML = "";
+
+  if(layers.length === 0){
+    container.innerHTML = `<div class="hint">Слоёв пока нет. Нажми «Разбить сцену».</div>`;
+    return;
+  }
+
+  layers.forEach((layer, i) => {
+    const kindLabel = layer.kind === "background" ? "Фон" : "Объект";
+    const hasImg = !!layer.imageDataUrl;
+
+    const div = document.createElement("div");
+    div.className = "layer";
+    div.innerHTML = `
+      <div class="layerTop">
+        <div>
+          <div class="layerName">${escapeHtml(layer.name || ("Layer "+(i+1)))} <span style="color:#9bb0d6;font-weight:800">· ${kindLabel}</span></div>
+          <small>${escapeHtml(layer.role || "")}</small>
+        </div>
+        <div class="row">
+          <button class="secondary" onclick="improveLayer(${i})">Улучшить</button>
+          <button onclick="regenLayer(${i})">${hasImg ? "Реген" : "Сген"}</button>
+          <button class="danger" onclick="removeLayer(${i})">Удалить</button>
+        </div>
+      </div>
+
+      <textarea onchange="updateLayerPrompt(${i}, this.value)">${escapeHtml(layer.prompt || "")}</textarea>
+
+      <div class="sliders">
+        <div class="sliderBox">
+          <label><span>Scale</span><span>${(layer.scale ?? 1).toFixed(2)}</span></label>
+          <input type="range" min="0.2" max="2.0" step="0.01" value="${layer.scale ?? 1}" oninput="setLayerScale(${i}, this.value)">
+        </div>
+        <div class="sliderBox">
+          <label><span>Opacity</span><span>${Math.round((layer.opacity ?? 1)*100)}%</span></label>
+          <input type="range" min="0" max="1" step="0.01" value="${layer.opacity ?? 1}" oninput="setLayerOpacity(${i}, this.value)">
+        </div>
+        <div class="sliderBox">
+          <label><span>X</span><span>${Math.round(layer.x ?? 0)}</span></label>
+          <input type="range" min="-300" max="300" step="1" value="${layer.x ?? 0}" oninput="setLayerX(${i}, this.value)">
+        </div>
+        <div class="sliderBox">
+          <label><span>Y</span><span>${Math.round(layer.y ?? 0)}</span></label>
+          <input type="range" min="-300" max="300" step="1" value="${layer.y ?? 0}" oninput="setLayerY(${i}, this.value)">
+        </div>
+        <div class="sliderBox" style="grid-column:1 / span 2;">
+          <label><span>Chroma threshold</span><span>${Math.round(layer.chromaThreshold ?? 55)}</span></label>
+          <input type="range" min="10" max="120" step="1" value="${layer.chromaThreshold ?? 55}" oninput="setLayerThreshold(${i}, this.value)">
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function updateLayerPrompt(i, v){ layers[i].prompt = v; }
+function removeLayer(i){ layers.splice(i,1); renderLayers(); renderComposite(); }
+function setLayerScale(i, v){ layers[i].scale = parseFloat(v); renderLayers(); renderComposite(); }
+function setLayerOpacity(i, v){ layers[i].opacity = parseFloat(v); renderLayers(); renderComposite(); }
+function setLayerX(i, v){ layers[i].x = parseFloat(v); renderLayers(); renderComposite(); }
+function setLayerY(i, v){ layers[i].y = parseFloat(v); renderLayers(); renderComposite(); }
+function setLayerThreshold(i, v){ layers[i].chromaThreshold = parseInt(v, 10); renderLayers(); renderComposite(); }
+
+async function decompose(){
+  if(busy) return;
+  setError("");
+  const scene = document.getElementById("sceneInput").value.trim();
+  if(!scene){ setError("Пусто. Напиши сцену."); return; }
+
+  setBusy(true);
+
+  const prompt = `Ты — ассистент по промптам для генерации изображений.
+Разбей описание сцены на СТРОГИЙ JSON МАССИВ (без markdown, без пояснений).
+Схема:
+{
+  "name": "Background|Subject|Props|Lighting|Atmosphere|Style",
+  "role": "коротко что делает слой",
+  "kind": "background|object",
+  "prompt": "детальный промпт для этого слоя"
+}
+Правила:
+- Верни ТОЛЬКО валидный JSON.
+- 4–6 слоёв.
+- Один слой обязательно kind=background.
+- На русском.
+Сцена: ${scene}`;
+
+  const data = await apiPost("/generate_text", {prompt});
+  setBusy(false);
+
+  if(data.error){ setError(data.error); return; }
+
+  try{
+    const arr = JSON.parse((data.text || "").trim());
+    if(!Array.isArray(arr)) throw new Error("JSON не массив");
+
+    layers = arr.map(x => ({
+      name: x.name || "",
+      role: x.role || "",
+      kind: (x.kind || "object").toLowerCase() === "background" ? "background" : "object",
+      prompt: x.prompt || "",
+      imageDataUrl: null,
+      keyColor: KEY_COLOR,
+      x: 0, y: 0,
+      scale: 1.0,
+      opacity: 1.0,
+      chromaThreshold: 55,
+    }));
+
+    // If model forgot background, force one
+    if(!layers.some(l => l.kind === "background")){
+      layers.unshift({
+        name: "Background",
+        role: "фон/сцена",
+        kind: "background",
+        prompt: scene,
+        imageDataUrl: null,
+        keyColor: KEY_COLOR,
+        x: 0, y: 0, scale: 1.0, opacity: 1.0, chromaThreshold: 55
+      });
+    }
+
+    renderLayers();
+  }catch(e){
+    setError("Не смог разобрать JSON от модели.\n\nОтвет модели:\n" + (data.text || ""));
+  }
+}
+
+async function improveWholePrompt(){
+  if(busy) return;
+  setError("");
+  const scene = document.getElementById("sceneInput").value.trim();
+  if(!scene){ setError("Пусто. Напиши сцену."); return; }
+
+  setBusy(true);
+  const data = await apiPost("/generate_text", {
+    prompt: `Улучши промпт для генерации изображения. Сохрани смысл, добавь конкретики (ракурс, свет, оптика/стиль), избегай противоречий. Верни ТОЛЬКО улучшенный промпт одним текстом.\n\nПромпт: ${scene}`
+  });
+  setBusy(false);
+
+  if(data.error){ setError(data.error); return; }
+  document.getElementById("sceneInput").value = (data.text || "").trim();
+}
+
+async function improveLayer(i){
+  if(busy) return;
+  setError("");
+  const p = (layers[i].prompt || "").trim();
+  if(!p){ setError("У слоя пустой промпт."); return; }
+
+  setBusy(true);
+  const data = await apiPost("/generate_text", {
+    prompt: `Улучши промпт для генерации изображения. Сохрани смысл, добавь конкретики (ракурс, свет, стиль), убери воду и противоречия. Верни ТОЛЬКО улучшенный промпт одним текстом.\n\nПромпт: ${p}`
+  });
+  setBusy(false);
+
+  if(data.error){ setError(data.error); return; }
+  layers[i].prompt = (data.text || "").trim();
+  renderLayers();
+}
+
+async function regenLayer(i){
+  if(busy) return;
+  setError("");
+  const layer = layers[i];
+  const p = (layer.prompt || "").trim();
+  if(!p){ setError("У слоя пустой промпт."); return; }
+
+  setBusy(true);
+  const data = await apiPost("/generate_layer", {
+    prompt: p,
+    layer_name: layer.name || ("Layer " + (i+1)),
+    layer_kind: layer.kind,
+    key_color: layer.keyColor || KEY_COLOR
+  });
+  setBusy(false);
+
+  if(data.error){ setError(data.error); return; }
+  if(!data.image_base64){ setError("Нет изображения в ответе."); return; }
+
+  const mime = data.mime_type || "image/png";
+  layer.keyColor = (data.key_color || layer.keyColor || KEY_COLOR).toUpperCase();
+  layer.imageDataUrl = `data:${mime};base64,${data.image_base64}`;
+
+  renderLayers();
+  await renderComposite();
+}
+
+async function generateAll(){
+  if(busy) return;
+  setError("");
+
+  // If no layers, generate a basic set from scene
+  if(layers.length === 0){
+    const scene = document.getElementById("sceneInput").value.trim();
+    if(!scene){ setError("Пусто. Напиши сцену."); return; }
+    layers = [
+      {name:"Background", role:"фон/сцена", kind:"background", prompt:scene, imageDataUrl:null, keyColor:KEY_COLOR, x:0,y:0,scale:1,opacity:1,chromaThreshold:55},
+      {name:"Subject", role:"главный объект", kind:"object", prompt:"Главный объект сцены: " + scene, imageDataUrl:null, keyColor:KEY_COLOR, x:0,y:0,scale:1,opacity:1,chromaThreshold:55},
+      {name:"Atmosphere", role:"эффекты/атмосфера", kind:"object", prompt:"Эффекты и атмосфера (дым, дождь, частицы) для сцены: " + scene, imageDataUrl:null, keyColor:KEY_COLOR, x:0,y:0,scale:1,opacity:0.9,chromaThreshold:55},
+    ];
+    renderLayers();
+  }
+
+  // Generate background first, then objects
+  const bgIndex = layers.findIndex(l => l.kind === "background");
+  if(bgIndex >= 0 && !layers[bgIndex].imageDataUrl){
+    await regenLayer(bgIndex);
+  }
+
+  for(let i=0;i<layers.length;i++){
+    if(i === bgIndex) continue;
+    if(!layers[i].imageDataUrl){
+      await regenLayer(i);
+    }
+  }
+
+  // Save history snapshot
+  const summaryPrompt = layers.map(l => `${l.name}: ${l.prompt}`).join("\n");
+  addToHistory(summaryPrompt);
+}
+
+function clearCanvas(){
+  canvas.width = 1024;
+  canvas.height = 768;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = "rgba(0,0,0,0)";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+
+function hexToRgb(hex){
+  const h = hex.replace("#","").trim();
+  const full = h.length === 3 ? h.split("").map(c=>c+c).join("") : h;
+  const n = parseInt(full, 16);
+  return {r:(n>>16)&255, g:(n>>8)&255, b:n&255};
+}
+
 function chromaKeyImageData(img.preview{padding:14px}
 .imgBox{width:100%;aspect-ratio:4/3;border-radius:14px;border:1px dashed rgba(33,48,73,.9);background:rgba(7,10,16,.35);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
 .imgBox img{width:100%;height:100%;object-fit:contain;display:block}
